@@ -1,2 +1,2 @@
-class ExistingExecutorName(Exception): pass
+class ExistingTaskName(Exception): pass
 class DuplicateDependency(Exception): pass

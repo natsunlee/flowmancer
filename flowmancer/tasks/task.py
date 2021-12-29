@@ -1,18 +1,21 @@
 import traceback, os
-import multiprocessing.sharedctypes
+from multiprocessing.sharedctypes import Value
 from abc import ABC, abstractmethod
-
+from ..logger.logger import Logger
 
 class Task(ABC):
 
-    def __init__(self):
-        self._is_failed = multiprocessing.sharedctypes.Value("i", 0)
+    def __init__(self, logger: Logger):
+        self._is_failed = Value("i", 0)
+        self.logger = logger
 
     def _exec_lifecycle_stage(self, stage) -> None:
         try:
             stage()
-        except Exception:
+        except Exception as e:
             self.is_failed = True
+            self.logger.error(str(e))
+            self.logger.error(traceback.format_exc())
 
     @property
     def is_failed(self) -> bool:
@@ -23,7 +26,8 @@ class Task(ABC):
         self._is_failed.value = 1 if val else 0
 
     def run_lifecycle(self):
-        nullfd = os.open(os.devnull,os.O_RDWR)
+        self.logger.prepare()
+        nullfd = os.open(os.devnull, os.O_RDWR)
         os.dup2(nullfd, 1)
         os.dup2(nullfd, 2)
 
@@ -43,10 +47,14 @@ class Task(ABC):
     def run(self):
         pass
     def on_create(self):
+        # Optional lifecycle method
         pass
     def on_success(self):
+        # Optional lifecycle method
         pass
     def on_failure(self):
+        # Optional lifecycle method
         pass
     def on_destroy(self):
+        # Optional lifecycle method
         pass

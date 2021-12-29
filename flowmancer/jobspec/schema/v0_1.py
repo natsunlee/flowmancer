@@ -12,4 +12,6 @@ class TaskDefinition(BaseModel):
 
 class JobDefinition(BaseModel):
     version: float
+    pypath: List[str]
+    logger: Dict[str, Any]
     tasks: Dict[str, TaskDefinition]

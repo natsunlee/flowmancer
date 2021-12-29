@@ -3,20 +3,22 @@ from typing import List
 from .typedefs.enums import ExecutionState
 from .typedefs.exceptions import DuplicateDependency
 from .tasks.task import Task
+from .logger.logger import Logger
 
 class Executor:
-    def __init__(self, name: str = None, dependencies: List["Executor"] = None) -> None:
+    def __init__(self, name: str) -> None:
         self._event = asyncio.Event()
         self.name = name or uuid.uuid4()
-        self._dependencies = dependencies or []
+        self._dependencies: List["Executor"] = []
         self._state = ExecutionState.PENDING
+        self.logger: Logger
 
         self.max_attempts = 1
         self.backoff = 0
         self._attempts = 0
 
-        self.module = None
-        self.task = None
+        self.module: str
+        self.task: str
     
     def __hash__(self) -> int:
         return hash(self.name)
@@ -43,13 +45,6 @@ class Executor:
     def is_alive(self) -> bool:
         return not self._event.is_set()
 
-    #@property
-    #def TaskClass(self) -> Task:
-    #    spec = importlib.util.spec_from_file_location(self.module, config['framework']['worker_dir'] + '/' + self.module + '.py')
-    #    module = importlib.util.module_from_spec(spec)
-    #    spec.loader.exec_module(module)
-    #    return getattr(module, self.worker)
-
     @property
     def TaskClass(self) -> Task:
         task_class = getattr(importlib.import_module(self.module), self.task)
@@ -68,7 +63,7 @@ class Executor:
                 self.state = ExecutionState.DEFAULTED
                 self._event.set()
 
-        task = self.TaskClass()
+        task = self.TaskClass(self.logger)
 
         while self._attempts < self.max_attempts and self.state == ExecutionState.PENDING:
             self.state = ExecutionState.RUNNING

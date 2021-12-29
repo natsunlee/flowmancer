@@ -10,7 +10,14 @@ class ExecutionState(Enum):
     NORUN = "N"
 
 class Signal(Enum):
-    ABORT = 1
-    PAUSE = 2
-    PULSE = 3
-    REVIVE = 4
+    ABORT = 0
+    PAUSE = 1
+    PULSE = 2
+    REVIVE = 3
+
+class LogLevel(Enum):
+    DEBUG = 0
+    INFO = 1
+    WARNING = 2
+    ERROR = 3
+    CRITICAL = 4
