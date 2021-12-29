@@ -1,4 +1,4 @@
-import asyncio, uuid, multiprocessing, time, importlib
+import asyncio, multiprocessing, time, importlib
 from typing import List
 from .typedefs.enums import ExecutionState
 from .typedefs.exceptions import DuplicateDependency
@@ -8,10 +8,10 @@ from .logger.logger import Logger
 class Executor:
     def __init__(self, name: str) -> None:
         self._event = asyncio.Event()
-        self.name = name or uuid.uuid4()
         self._dependencies: List["Executor"] = []
         self._state = ExecutionState.PENDING
         self.logger: Logger
+        self.name = name
 
         self.max_attempts = 1
         self.backoff = 0
@@ -56,12 +56,12 @@ class Executor:
         await self._event.wait()
 
     async def start(self) -> None:
-        # Dependency wait
         for d in self._dependencies:
             await d.wait()
             if d.state == ExecutionState.FAILED:
                 self.state = ExecutionState.DEFAULTED
                 self._event.set()
+                return
 
         task = self.TaskClass(self.logger)
 
@@ -72,14 +72,11 @@ class Executor:
 
             proc = multiprocessing.Process(target=task.run_lifecycle, daemon=False)
             proc.start()
-
-            while proc.is_alive():
-                await asyncio.sleep(1)
-            proc.join()
+            loop = asyncio.get_running_loop()
+            await asyncio.gather(loop.run_in_executor(None, proc.join))
             self._end_time = time.time()
             
             if task.is_failed and (self._attempts < self.max_attempts):
-                self.state = ExecutionState.PENDING
                 await asyncio.sleep(self.backoff)
 
         self.state = ExecutionState.FAILED if task.is_failed else ExecutionState.COMPLETED

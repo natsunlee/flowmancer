@@ -8,7 +8,6 @@ class TaskDefinition(BaseModel):
     max_attempts: Optional[int]
     backoff: Optional[int]
     kwargs: Optional[Dict[str, Any]]
-    logging: Optional[Dict[str, Any]]
 
 class JobDefinition(BaseModel):
     version: float
