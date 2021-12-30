@@ -1,5 +1,6 @@
 import asyncio, sys, os, inspect
 from typing import Dict
+from pathlib import Path
 from .executor import Executor
 from .typedefs.enums import ExecutionState
 from .jobspec.schema.v0_1 import JobDefinition
@@ -7,9 +8,10 @@ from .typedefs.exceptions import ExistingTaskName
 from .jobspec.yaml import YAML
 from .watchers.progressbar import ProgressBar
 from .watchers.monitor import Monitor
+from .watchers.synchro import Synchro
+from .watchers.snapshot import Snapshot
 from .logger.file import FileLogger
 from .logger.logger import Logger
-from pathlib import Path
 
 class Flowmancer:
     def __init__(self, jobspec_file: str):
@@ -51,7 +53,9 @@ class Flowmancer:
             asyncio.create_task(ex.start())
             for ex in executors.values()
         ]
-        tasks.append(ProgressBar(executors).start())
+        tasks.append(ProgressBar(executors).start_wrapper())
+        tasks.append(Synchro(executors).start_wrapper())
+        tasks.append(Snapshot(executors).start_wrapper())
         #tasks.append(Monitor(executors).start())
         await asyncio.gather(*tasks)
         

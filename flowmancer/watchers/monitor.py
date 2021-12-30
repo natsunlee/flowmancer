@@ -8,15 +8,11 @@ class Monitor(Watcher):
         executors_by_state = defaultdict(lambda:set())
         for _, ex in self.executors.items():
             executors_by_state[ex.state].add(ex)
-
-        is_complete = False
+        
         start_time = time.time()
-        while not is_complete:
-            is_complete = True
+        while not self.stop:
             for state in (ExecutionState.PENDING, ExecutionState.RUNNING):
                 for ex in executors_by_state[state].copy():
-                    if ex.is_alive:
-                        is_complete = False
                     if ex.state != state:
                         executors_by_state[state].remove(ex)
                         executors_by_state[ex.state].add(ex)
@@ -28,6 +24,5 @@ class Monitor(Watcher):
                 len(executors_by_state[ExecutionState.DEFAULTED]),
                 time.time() - start_time
             ))
-            if not is_complete:
+            if not self.stop:
                 await asyncio.sleep(1)
-        self._event.set()

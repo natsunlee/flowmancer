@@ -18,14 +18,14 @@ class Snapshot:
                 for ex in self._executors.values()
             }
         }
-        tmp = f"{str(self._snapshot_dir)}/something.tmp"
-        perm = f"{str(self._snapshot_dir)}/something"
+        tmp = f"{str(self._snapshot_dir)}/snapshot.tmp"
+        perm = f"{str(self._snapshot_dir)}/snapshot"
         pickle.dump(snapshot, open(tmp, 'wb'))
         if os.path.isfile(perm):
             os.unlink(perm)
         os.rename(tmp, perm)
     
     def load_snapshot(self) -> Tuple(JobDefinition, Dict[str, str]):
-        snapshot_file = f"{str(self._snapshot_dir)}/something"
+        snapshot_file = f"{str(self._snapshot_dir)}/snapshot"
         snapshot = pickle.load(open(snapshot_file, "rb"))
         return snapshot["job"], snapshot["states"]

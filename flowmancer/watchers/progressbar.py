@@ -10,7 +10,7 @@ class ProgressBar(Watcher):
         failed = 0
     
         with tqdm(total=total) as pbar:
-            while pending:
+            while not self.stop:
                 running = 0
                 for ex in pending.copy():
                     if not ex.is_alive:
@@ -23,4 +23,3 @@ class ProgressBar(Watcher):
                         if ex.state == ExecutionState.RUNNING: running += 1
                 pbar.set_description(f"Running: {running} - Failed: {failed}")
                 await asyncio.sleep(0.5)
-        self._event.set()
