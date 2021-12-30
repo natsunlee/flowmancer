@@ -1,4 +1,3 @@
-import asyncio
 from .watcher import Watcher, _root_event
 
 class Synchro(Watcher):
@@ -8,5 +7,5 @@ class Synchro(Watcher):
             for ex in pending.copy():
                 if not ex.is_alive:
                     pending.remove(ex)
-            await asyncio.sleep(0.5)
+            await self.sleep()
         _root_event.set()

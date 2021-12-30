@@ -1,4 +1,4 @@
-import time, asyncio
+import time
 from .watcher import Watcher
 from ..typedefs.enums import ExecutionState
 from collections import defaultdict
@@ -25,4 +25,4 @@ class Monitor(Watcher):
                 time.time() - start_time
             ))
             if not self.stop:
-                await asyncio.sleep(1)
+                await self.sleep()

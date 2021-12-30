@@ -1,4 +1,3 @@
-import asyncio
 from .watcher import Watcher
 from tqdm import tqdm
 from ..typedefs.enums import ExecutionState
@@ -22,4 +21,4 @@ class ProgressBar(Watcher):
                         pbar.update(0)
                         if ex.state == ExecutionState.RUNNING: running += 1
                 pbar.set_description(f"Running: {running} - Failed: {failed}")
-                await asyncio.sleep(0.5)
+                await self.sleep()
