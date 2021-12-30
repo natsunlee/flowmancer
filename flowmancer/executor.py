@@ -9,7 +9,7 @@ class Executor:
     def __init__(self, name: str) -> None:
         self._event = asyncio.Event()
         self._dependencies: List["Executor"] = []
-        self._state = ExecutionState.PENDING
+        self.state = ExecutionState.PENDING
         self.logger: Logger
         self.name = name
 
@@ -20,10 +20,10 @@ class Executor:
         self.module: str
         self.task: str
     
-    def __hash__(self) -> int:
-        return hash(self.name)
-    def __eq__(self, other) -> bool:
-        return self.name == other.name
+    #def __hash__(self) -> int:
+    #    return hash(self.name)
+    #def __eq__(self, other) -> bool:
+    #    return self.name == other.name
 
     def add_dependency(self, dep: "Executor") -> None:
         if type(dep) != type(self):
@@ -31,15 +31,6 @@ class Executor:
         if dep in self._dependencies:
             raise DuplicateDependency(f"Dependency '{dep.name}' already exists for '{self.name}'.")
         self._dependencies.append(dep)
-
-    @property
-    def state(self) -> ExecutionState:
-        return self._state
-    @state.setter
-    def state(self, val: ExecutionState) -> None:
-        if not isinstance(val, ExecutionState):
-            raise TypeError("Value for 'state' must be of ExecutionState type.")
-        self._state = val
     
     @property
     def is_alive(self) -> bool:
@@ -56,12 +47,23 @@ class Executor:
         await self._event.wait()
 
     async def start(self) -> None:
+        # In the event of a restart and this task is already complete, return immediately.
+        if self.state == ExecutionState.COMPLETED:
+            self._event.set()
+            return
+
+        # Wait for the completion of prior/dependency tasks.
         for d in self._dependencies:
             await d.wait()
             if d.state == ExecutionState.FAILED:
                 self.state = ExecutionState.DEFAULTED
                 self._event.set()
                 return
+        
+        # In the event of skipped task, return immediately.
+        if self.state == ExecutionState.NORUN:
+            self._event.set()
+            return
 
         task = self.TaskClass(self.logger)
 
