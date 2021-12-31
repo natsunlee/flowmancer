@@ -14,8 +14,8 @@ class Task(ABC):
             stage()
         except Exception as e:
             self.is_failed = True
-            self.logger.error(str(e))
-            self.logger.error(traceback.format_exc())
+            self.logger.critical(str(e))
+            self.logger.critical(traceback.format_exc())
 
     @property
     def is_failed(self) -> bool:

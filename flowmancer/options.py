@@ -1,10 +1,10 @@
-from optparse import OptionParser
+from argparse import ArgumentParser
+from argparse import Namespace
 
-parser = OptionParser()
-parser.add_option("-j", "--jobdef", action="store", dest="jobdef")
-parser.add_option("-r", "--restart", action="store_true", dest="restart", default=False)
+parser = ArgumentParser(description='Flowmancer command line options.')
 
-(options, args) = parser.parse_args()
+parser.add_argument("-j", "--jobdef", action="store", dest="jobdef")
+parser.add_argument("-r", "--restart", action="store_true", dest="restart", default=False)
 
-print(options.jobdef)
-print(options.restart)
+def parse_args() -> Namespace:
+    return parser.parse_args()

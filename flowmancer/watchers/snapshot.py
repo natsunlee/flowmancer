@@ -1,14 +1,12 @@
 import time, os, pickle
-from typing import Dict, Union
-
-from flowmancer.jobspec.schema.v0_1 import JobDefinition
+from typing import Dict
 from pathlib import Path
 from .watcher import Watcher
 
-def load_snapshot(snapshot_dir: str, snapshot_name: str) -> Union[Dict[str, str], None]:
+def load_snapshot(snapshot_dir: str, snapshot_name: str) -> Dict[str, str]:
     snapshot_file = Path(snapshot_dir) / snapshot_name
     if not snapshot_file.exists():
-        return None
+        return dict()
     snapshot = pickle.load(open(snapshot_file, "rb"))
     return snapshot["states"]
 

@@ -10,10 +10,10 @@ class LoggersDefinition(BaseModel):
 class TaskDefinition(BaseModel):
     module: str
     task: str
-    dependencies: Optional[List[str]]
-    max_attempts: Optional[int]
-    backoff: Optional[int]
-    kwargs: Optional[Dict[str, Any]]
+    dependencies: Optional[List[str]] = []
+    max_attempts: Optional[int] = 1
+    backoff: Optional[int] = 0
+    kwargs: Optional[Dict[str, Any]] = dict()
 
 class SnapshotsDefinition(BaseModel):
     path: str
@@ -21,7 +21,7 @@ class SnapshotsDefinition(BaseModel):
 class JobDefinition(BaseModel):
     version: float
     name: str
-    pypath: List[str]
-    loggers: LoggersDefinition
     tasks: Dict[str, TaskDefinition]
+    pypath: Optional[List[str]] = []
+    loggers: Optional[LoggersDefinition] = LoggersDefinition()
     snapshots: Optional[SnapshotsDefinition]

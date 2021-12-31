@@ -7,54 +7,38 @@ from .jobspec.schema.v0_1 import JobDefinition
 from .typedefs.exceptions import ExistingTaskName
 from .jobspec.yaml import YAML
 from .watchers.progressbar import ProgressBar
-from .watchers.monitor import Monitor
 from .watchers.synchro import Synchro
 from .watchers.snapshot import Snapshot, load_snapshot
-from .logger.file import FileLogger
-from .logger.logger import Logger
+from .options import parse_args
 
 class Flowmancer:
     def __init__(self, jobdef_file: str):
+        # To ensure all paths are resolved relative to the caller.
+        self._caller_dir = Path(os.path.abspath((inspect.stack()[1])[1])).parent
+        os.chdir(self._caller_dir)
+
         self._jobspec = YAML()
         self._jobdef: JobDefinition = self._jobspec.load(jobdef_file)
-        self._caller_dir = Path(os.path.abspath((inspect.stack()[1])[1])).parent
-
-    def get_logger(self):
-        pass
     
     def update_python_path(self):
-        for p in (self._jobdef.pypath or []):
+        for p in self._jobdef.pypath:
             expanded = os.path.expandvars(os.path.expanduser(p))
             if expanded not in sys.path:
                 sys.path.append(expanded)
 
-    def build_executors(self, states: Dict[str, str] = None) -> Dict[str, Executor]:
-        executors = dict()
-        for name in self._jobdef.tasks:
-            if name in executors:
-                raise ExistingTaskName(f"Task with name '{name}' already exists.")
-            ex = Executor(name)
-            if states:
-                saved_state = states[name]
-                if saved_state not in (ExecutionState.COMPLETED, ExecutionState.NORUN):
-                    saved_state = ExecutionState.PENDING
-                ex.state = saved_state
-            executors[name] = ex
-        for task, detl in self._jobdef.tasks.items():
-            ex = executors[task]
-            ex.module = detl.module
-            ex.task = detl.task
-            expanded = os.path.expandvars(os.path.expanduser(self._jobdef.loggers.file.path))
-            ex.logger = FileLogger(f"{expanded}/{task}.log")
-            for d in (detl.dependencies or []):
-                if d not in executors:
-                    raise ValueError(f"Dependency '{d}' does not exist.")
-                executors[task].add_dependency(executors[d])
-        return executors
-
     async def initiate(self) -> int:
         self.update_python_path()
-        executors = self.build_executors(load_snapshot("./temp", "snapshot"))
+
+        snapshot_states = dict()
+        args = parse_args()
+        if args.restart:
+            snapshot_states = load_snapshot("./temp", "snapshot")
+        
+        executors = dict()
+        for name, taskdef in self._jobdef.tasks.items():
+            if name in executors:
+                raise ExistingTaskName(f"Task with name '{name}' already exists.")
+            executors[name] = Executor(name, taskdef, self._jobdef.loggers, lambda x: executors[x], snapshot_states.get(name))
         tasks = [
             asyncio.create_task(ex.start())
             for ex in executors.values()
@@ -64,10 +48,9 @@ class Flowmancer:
             "executors": executors,
             "jobdef": self._jobdef
         }
-        tasks.append(ProgressBar(**watcher_kwargs).start_wrapper())
         tasks.append(Synchro(**watcher_kwargs).start_wrapper())
         tasks.append(Snapshot(snapshot_dir="./temp", **watcher_kwargs).start_wrapper())
-        #tasks.append(Monitor(executors).start_wrapper())
+        tasks.append(ProgressBar(**watcher_kwargs).start_wrapper())
         
         await asyncio.gather(*tasks)
         

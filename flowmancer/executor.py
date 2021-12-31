@@ -1,36 +1,33 @@
 import asyncio, multiprocessing, time, importlib
-from typing import List
+from typing import Callable
 from .typedefs.enums import ExecutionState
-from .typedefs.exceptions import DuplicateDependency
 from .tasks.task import Task
-from .logger.logger import Logger
+from .jobspec.schema.v0_1 import LoggersDefinition, TaskDefinition
+from .logmanager import LogManager
 
 class Executor:
-    def __init__(self, name: str) -> None:
+    def __init__(
+        self, name: str,
+        taskdef: TaskDefinition,
+        logsdef: LoggersDefinition,
+        dependency_resolver: Callable,
+        restore_state: ExecutionState = None
+    ) -> None:
         self._event = asyncio.Event()
-        self._dependencies: List["Executor"] = []
-        self.state = ExecutionState.PENDING
-        self.logger: Logger
         self.name = name
+        self._logger = LogManager(name, logsdef)
+        self._dep_resolver = dependency_resolver
 
-        self.max_attempts = 1
-        self.backoff = 0
+        self.state = ExecutionState.PENDING
+        if restore_state in (ExecutionState.COMPLETED, ExecutionState.NORUN):
+            self.state = restore_state
+
+        self.dependencies = taskdef.dependencies
+        self.module = taskdef.module
+        self.task = taskdef.task
+        self.max_attempts = taskdef.max_attempts
+        self.backoff = taskdef.backoff
         self._attempts = 0
-
-        self.module: str
-        self.task: str
-    
-    #def __hash__(self) -> int:
-    #    return hash(self.name)
-    #def __eq__(self, other) -> bool:
-    #    return self.name == other.name
-
-    def add_dependency(self, dep: "Executor") -> None:
-        if type(dep) != type(self):
-            raise TypeError(f"Dependency must be of 'Executor' type.")
-        if dep in self._dependencies:
-            raise DuplicateDependency(f"Dependency '{dep.name}' already exists for '{self.name}'.")
-        self._dependencies.append(dep)
     
     @property
     def is_alive(self) -> bool:
@@ -53,7 +50,8 @@ class Executor:
             return
 
         # Wait for the completion of prior/dependency tasks.
-        for d in self._dependencies:
+        for dep_name in self.dependencies:
+            d = self._dep_resolver(dep_name)
             await d.wait()
             if d.state == ExecutionState.FAILED:
                 self.state = ExecutionState.DEFAULTED
@@ -65,7 +63,7 @@ class Executor:
             self._event.set()
             return
 
-        task = self.TaskClass(self.logger)
+        task = self.TaskClass(self._logger)
 
         while self._attempts < self.max_attempts and self.state == ExecutionState.PENDING:
             self.state = ExecutionState.RUNNING

@@ -1,9 +1,11 @@
 import logging
+
+from ..jobspec.schema.v0_1 import FileLoggerDefinition
 from .logger import Logger
 
 class FileLogger(Logger):
-    def __init__(self, filename: str) -> None:
-        self.filename = filename
+    def __init__(self, task_name: str, detl: FileLoggerDefinition) -> None:
+        self.filename = f"{detl.path}/{task_name}.log"
         self._level = logging.INFO
     
     def prepare(self) -> None:
@@ -11,8 +13,8 @@ class FileLogger(Logger):
             filename=self.filename,
             filemode='a+',
             level=self._level,
-            format='%(asctime)s (%(levelname)s) - %(message)s',
-            datefmt='%Y-%m-%d %I:%M:%S %p'
+            format='%(asctime)s [%(levelname)s] - %(message)s',
+            datefmt='%Y-%m-%d %I:%M:%S %p %Z'
         )
     
     def debug(self, msg: str) -> None:
