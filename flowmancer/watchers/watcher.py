@@ -13,19 +13,22 @@ class Watcher(ABC):
         self.executors: Dict[str, Executor] = kwargs["executors"]
         self.jobdef: JobDefinition = kwargs["jobdef"]
 
-    @property
-    def stop(self) -> bool:
-        return _root_event.is_set()
-
-    async def start_wrapper(self) -> None:
-        await self.start()
-        self._event.set()
-    
     async def sleep(self, seconds: int = -1) -> None:
         if seconds < 0:
             seconds = self._sleep_time
         await asyncio.sleep(seconds)
 
-    @abstractmethod
     async def start(self) -> None:
+        while not _root_event.is_set():
+            self.update()
+            await asyncio.sleep(self._sleep_time)
+        self._event.set()
+        self.on_destroy()
+
+    @abstractmethod
+    def update(self) -> None:
+        pass
+
+    def on_destroy(self) -> None:
+        # Optional cleanup method.
         pass

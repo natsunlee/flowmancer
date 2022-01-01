@@ -7,6 +7,7 @@ from .jobspec.schema.v0_1 import JobDefinition
 from .typedefs.exceptions import ExistingTaskName
 from .jobspec.yaml import YAML
 from .watchers.progressbar import ProgressBar
+from .watchers.monitor import Monitor
 from .watchers.synchro import Synchro
 from .watchers.snapshot import Snapshot, load_snapshot
 from .options import parse_args
@@ -48,9 +49,10 @@ class Flowmancer:
             "executors": executors,
             "jobdef": self._jobdef
         }
-        tasks.append(Synchro(**watcher_kwargs).start_wrapper())
-        tasks.append(Snapshot(snapshot_dir="./temp", **watcher_kwargs).start_wrapper())
-        tasks.append(ProgressBar(**watcher_kwargs).start_wrapper())
+        tasks.append(Synchro(**watcher_kwargs).start())
+        tasks.append(Snapshot(snapshot_dir="./temp", **watcher_kwargs).start())
+        #tasks.append(ProgressBar(**watcher_kwargs).start())
+        tasks.append(Monitor(**watcher_kwargs).start())
         
         await asyncio.gather(*tasks)
         

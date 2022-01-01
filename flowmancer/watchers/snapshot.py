@@ -15,15 +15,15 @@ class Snapshot(Watcher):
         super().__init__(**kwargs)
         self._snapshot_dir = Path(kwargs["snapshot_dir"])
         self._snapshot_file = "snapshot"
+        self._checkpoint = 0
 
-    async def start(self):
-        checkpoint = time.time()
-        self.write_snapshot()
-        while not self.stop:
-            if (time.time() - checkpoint) >= 10:
-                checkpoint = time.time()
-                self.write_snapshot()
-            await self.sleep()
+    def update(self) -> None:
+        if (time.time() - self._checkpoint) >= 10:
+            self._checkpoint = time.time()
+            self.write_snapshot()
+    
+    def on_destroy(self) -> None:
+        # One final write to ensure final status is accurately captured.
         self.write_snapshot()
 
     def exists(self) -> bool:

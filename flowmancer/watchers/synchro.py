@@ -9,3 +9,9 @@ class Synchro(Watcher):
                     pending.remove(ex)
             await self.sleep()
         _root_event.set()
+    
+    def update(self) -> None:
+        # This watcher is unique - it is responsible for
+        # indicating to other watchers whether or not
+        # all tasks are complete.
+        pass

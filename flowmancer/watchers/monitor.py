@@ -4,25 +4,24 @@ from ..typedefs.enums import ExecutionState
 from collections import defaultdict
 
 class Monitor(Watcher):
-    async def start(self) -> None:
-        executors_by_state = defaultdict(lambda:set())
-        for _, ex in self.executors.items():
-            executors_by_state[ex.state].add(ex)
-        
-        start_time = time.time()
-        while not self.stop:
-            for state in (ExecutionState.PENDING, ExecutionState.RUNNING):
-                for ex in executors_by_state[state].copy():
-                    if ex.state != state:
-                        executors_by_state[state].remove(ex)
-                        executors_by_state[ex.state].add(ex)
-            print("Pending: {} | Running: {} | Completed: {} | Failed: {} | Defaulted: {} | Time Elapsed: {:.1f} sec.".format(
-                len(executors_by_state[ExecutionState.PENDING]),
-                len(executors_by_state[ExecutionState.RUNNING]),
-                len(executors_by_state[ExecutionState.COMPLETED]),
-                len(executors_by_state[ExecutionState.FAILED]),
-                len(executors_by_state[ExecutionState.DEFAULTED]),
-                time.time() - start_time
-            ))
-            if not self.stop:
-                await self.sleep()
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.executors_by_state = defaultdict(lambda:set())
+        for ex in self.executors.values():
+            self.executors_by_state[ex.state].add(ex)
+        self.start_time = time.time()
+    
+    def update(self) -> None:
+        for state in (ExecutionState.PENDING, ExecutionState.RUNNING):
+            for ex in self.executors_by_state[state].copy():
+                if ex.state != state:
+                    self.executors_by_state[state].remove(ex)
+                    self.executors_by_state[ex.state].add(ex)
+        print("Pending: {} | Running: {} | Completed: {} | Failed: {} | Defaulted: {} | Time Elapsed: {:.1f} sec.".format(
+            len(self.executors_by_state[ExecutionState.PENDING]),
+            len(self.executors_by_state[ExecutionState.RUNNING]),
+            len(self.executors_by_state[ExecutionState.COMPLETED]),
+            len(self.executors_by_state[ExecutionState.FAILED]),
+            len(self.executors_by_state[ExecutionState.DEFAULTED]),
+            time.time() - self.start_time
+        ))
