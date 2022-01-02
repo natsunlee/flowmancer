@@ -24,4 +24,4 @@ class JobDefinition(BaseModel):
     tasks: Dict[str, TaskDefinition]
     pypath: Optional[List[str]] = []
     loggers: Optional[LoggersDefinition] = LoggersDefinition()
-    snapshots: Optional[SnapshotsDefinition]
+    snapshots: Optional[SnapshotsDefinition] = SnapshotsDefinition(path="./temp")

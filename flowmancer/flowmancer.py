@@ -1,5 +1,4 @@
 import asyncio, sys, os, inspect
-from typing import Dict
 from pathlib import Path
 from .executor import Executor
 from .typedefs.enums import ExecutionState
@@ -7,9 +6,9 @@ from .jobspec.schema.v0_1 import JobDefinition
 from .typedefs.exceptions import ExistingTaskName
 from .jobspec.yaml import YAML
 from .watchers.progressbar import ProgressBar
-from .watchers.monitor import Monitor
 from .watchers.synchro import Synchro
-from .watchers.snapshot import Snapshot, load_snapshot
+from .watchers.checkpoint import Checkpoint
+from .snapshot import Snapshot
 from .options import parse_args
 
 class Flowmancer:
@@ -29,11 +28,12 @@ class Flowmancer:
 
     async def initiate(self) -> int:
         self.update_python_path()
+        snapshot = Snapshot(self._jobdef.name, self._jobdef.snapshots)
 
         snapshot_states = dict()
         args = parse_args()
         if args.restart:
-            snapshot_states = load_snapshot("./temp", "snapshot")
+            snapshot_states = snapshot.load_snapshot()
         
         executors = dict()
         for name, taskdef in self._jobdef.tasks.items():
@@ -50,9 +50,8 @@ class Flowmancer:
             "jobdef": self._jobdef
         }
         tasks.append(Synchro(**watcher_kwargs).start())
-        tasks.append(Snapshot(snapshot_dir="./temp", **watcher_kwargs).start())
-        #tasks.append(ProgressBar(**watcher_kwargs).start())
-        tasks.append(Monitor(**watcher_kwargs).start())
+        tasks.append(Checkpoint(snapshot=snapshot, **watcher_kwargs).start())
+        tasks.append(ProgressBar(**watcher_kwargs).start())
         
         await asyncio.gather(*tasks)
         
@@ -60,6 +59,8 @@ class Flowmancer:
         for ex in executors.values():
             if ex.state in (ExecutionState.FAILED, ExecutionState.DEFAULTED):
                 failed += 1
+        if not failed:
+            snapshot.delete()
         return failed
     
     def start(self) -> int:

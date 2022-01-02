@@ -10,13 +10,13 @@ class Executor:
         self, name: str,
         taskdef: TaskDefinition,
         logsdef: LoggersDefinition,
-        dependency_resolver: Callable,
+        resolve_dependency: Callable,
         restore_state: ExecutionState = None
     ) -> None:
         self._event = asyncio.Event()
         self.name = name
         self._logger = LogManager(name, logsdef)
-        self._dep_resolver = dependency_resolver
+        self._resolve_dependency = resolve_dependency
 
         self.state = ExecutionState.PENDING
         if restore_state in (ExecutionState.COMPLETED, ExecutionState.NORUN):
@@ -51,7 +51,7 @@ class Executor:
 
         # Wait for the completion of prior/dependency tasks.
         for dep_name in self.dependencies:
-            d = self._dep_resolver(dep_name)
+            d = self._resolve_dependency(dep_name)
             await d.wait()
             if d.state == ExecutionState.FAILED:
                 self.state = ExecutionState.DEFAULTED
