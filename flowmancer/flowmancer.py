@@ -12,13 +12,15 @@ from .snapshot import Snapshot
 from .options import parse_args
 
 class Flowmancer:
-    def __init__(self, jobdef_file: str):
+    def __init__(self, jobdef_file: str=None):
         # To ensure all paths are resolved relative to the caller.
         self._caller_dir = Path(os.path.abspath((inspect.stack()[1])[1])).parent
         os.chdir(self._caller_dir)
 
+        self._args = parse_args()
+
         self._jobspec = YAML()
-        self._jobdef: JobDefinition = self._jobspec.load(jobdef_file)
+        self._jobdef: JobDefinition = self._jobspec.load(self._args.jobdef or jobdef_file)
     
     def update_python_path(self):
         for p in self._jobdef.pypath:
@@ -31,8 +33,7 @@ class Flowmancer:
         snapshot = Snapshot(self._jobdef.name, self._jobdef.snapshots)
 
         snapshot_states = dict()
-        args = parse_args()
-        if args.restart:
+        if self._args.restart:
             snapshot_states = snapshot.load_snapshot()
         
         executors = dict()

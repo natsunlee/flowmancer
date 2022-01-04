@@ -9,7 +9,7 @@ _root_event = asyncio.Event()
 class Watcher(ABC):
     def __init__(self, **kwargs) -> None:
         self._event = asyncio.Event()
-        self._sleep_time = 0.5
+        self._sleep_time = kwargs.get("sleep_time", 0.5)
         self.executors: Dict[str, Executor] = kwargs["executors"]
         self.jobdef: JobDefinition = kwargs["jobdef"]
 

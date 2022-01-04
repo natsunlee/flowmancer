@@ -1,11 +1,11 @@
 import traceback, os
 from multiprocessing.sharedctypes import Value
 from abc import ABC, abstractmethod
-from ..logger.logger import Logger
+from ..logmanager import LogManager
 
 class Task(ABC):
 
-    def __init__(self, logger: Logger) -> None:
+    def __init__(self, logger: LogManager) -> None:
         self._is_failed = Value("i", 0)
         self.logger = logger
 
