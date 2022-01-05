@@ -1,9 +1,9 @@
 import time
-from .watcher import Watcher
+from .observer import Observer
 from ..typedefs.enums import ExecutionState
 from collections import defaultdict
 
-class Monitor(Watcher):
+class Monitor(Observer):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.executors_by_state = defaultdict(lambda:set())

@@ -1,6 +1,6 @@
-from .watcher import Watcher, _root_event
+from .observer import Observer, _root_event
 
-class Synchro(Watcher):
+class Synchro(Observer):
     async def start(self) -> None:
         pending = set(self.executors.values())
         while pending:
@@ -11,7 +11,7 @@ class Synchro(Watcher):
         _root_event.set()
     
     def update(self) -> None:
-        # This watcher is unique - it is responsible for
-        # indicating to other watchers whether or not
+        # This observer is unique - it is responsible for
+        # indicating to other observers whether or not
         # all tasks are complete.
         pass

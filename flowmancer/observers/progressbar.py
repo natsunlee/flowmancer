@@ -1,8 +1,8 @@
-from .watcher import Watcher
+from .observer import Observer
 from tqdm import tqdm
 from ..typedefs.enums import ExecutionState
 
-class ProgressBar(Watcher):
+class ProgressBar(Observer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.pending = set(self.executors.values())

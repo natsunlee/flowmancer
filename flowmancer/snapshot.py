@@ -8,13 +8,14 @@ class Snapshot:
     def __init__(self, snapshot_name: str, snapdef: SnapshotsDefinition) -> None:
         self._snapshot_name = snapshot_name
         self._snapshot_dir = Path(snapdef.path)
+        self._snapshot_dir.mkdir(parents=True, exist_ok=True)
 
     def exists(self) -> bool:
         return (self._snapshot_dir / self._snapshot_name).exists()
 
     def delete(self) -> None:
         if self.exists():
-            os.unlink(self._snapshot_dir / self._snapshot_file)
+            os.unlink(self._snapshot_dir / self._snapshot_name)
 
     def write_snapshot(self, states: Dict[str, ExecutionState]) -> None:
         snapshot = { "states": states }

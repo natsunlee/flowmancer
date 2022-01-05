@@ -1,12 +1,13 @@
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Dict
+from ..typedefs.enums import ExecutionState
 from ..executor import Executor
 from flowmancer.jobspec.schema.v0_1 import JobDefinition
 
 _root_event = asyncio.Event()
 
-class Watcher(ABC):
+class Observer(ABC):
     def __init__(self, **kwargs) -> None:
         self._event = asyncio.Event()
         self._sleep_time = kwargs.get("sleep_time", 0.5)
@@ -24,6 +25,12 @@ class Watcher(ABC):
             await asyncio.sleep(self._sleep_time)
         self._event.set()
         self.on_destroy()
+    
+    def failed_executors_exist(self) -> bool:
+        for ex in self.executors.values():
+            if ex.state == ExecutionState.FAILED:
+                return True
+        return False
 
     @abstractmethod
     def update(self) -> None:
