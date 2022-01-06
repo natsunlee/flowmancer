@@ -13,13 +13,13 @@ class Executor:
         resolve_dependency: Callable,
         restore_state: ExecutionState = None
     ) -> None:
-        self._event = asyncio.Event()
+        self._event: asyncio.Event
         self.name = name
         self._logger = LogManager(name, logsdef)
         self._resolve_dependency = resolve_dependency
 
         self.state = ExecutionState.PENDING
-        if restore_state in (ExecutionState.COMPLETED, ExecutionState.NORUN):
+        if restore_state in (ExecutionState.COMPLETED, ExecutionState.SKIP):
             self.state = restore_state
 
         self.dependencies = taskdef.dependencies
@@ -31,6 +31,8 @@ class Executor:
     
     @property
     def is_alive(self) -> bool:
+        if self._event is None:
+            return False
         return not self._event.is_set()
 
     @property
@@ -44,6 +46,8 @@ class Executor:
         await self._event.wait()
 
     async def start(self) -> None:
+        self._event = asyncio.Event()
+
         # In the event of a restart and this task is already complete, return immediately.
         if self.state == ExecutionState.COMPLETED:
             self._event.set()
@@ -59,7 +63,7 @@ class Executor:
                 return
         
         # In the event of skipped task, return immediately.
-        if self.state == ExecutionState.NORUN:
+        if self.state == ExecutionState.SKIP:
             self._event.set()
             return
 

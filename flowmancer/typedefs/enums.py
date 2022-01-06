@@ -7,7 +7,7 @@ class ExecutionState(Enum):
     DEFAULTED = "D"
     COMPLETED = "C"
     ABORTED = "A"
-    NORUN = "N"
+    SKIP = "S"
 
 class Signal(Enum):
     ABORT = 0

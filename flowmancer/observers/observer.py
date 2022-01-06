@@ -9,7 +9,6 @@ _root_event = asyncio.Event()
 
 class Observer(ABC):
     def __init__(self, **kwargs) -> None:
-        self._event = asyncio.Event()
         self._sleep_time = kwargs.get("sleep_time", 0.5)
         self.executors: Dict[str, Executor] = kwargs["executors"]
         self.jobdef: JobDefinition = kwargs["jobdef"]
@@ -23,7 +22,6 @@ class Observer(ABC):
         while not _root_event.is_set():
             self.update()
             await asyncio.sleep(self._sleep_time)
-        self._event.set()
         self.on_destroy()
     
     def failed_executors_exist(self) -> bool:

@@ -3,7 +3,7 @@ from pathlib import Path
 from .executor import Executor
 from .typedefs.enums import ExecutionState
 from .jobspec.schema.v0_1 import JobDefinition
-from .typedefs.exceptions import ExistingTaskName, MissingJobDef
+from .typedefs.exceptions import ExistingTaskName, MissingJobDef, ExecutorDoesNotExist
 from .jobspec.yaml import YAML
 from .observers.progressbar import ProgressBar
 from .observers.synchro import Synchro
@@ -22,9 +22,44 @@ class Flowmancer:
         if not jfile:
             raise MissingJobDef("No job definition file has been provided.")
 
+        # Read job definition
         self._jobspec = YAML()
         self._jobdef: JobDefinition = self._jobspec.load(jfile)
-    
+        self._snapshot = Snapshot(self._jobdef.name, self._jobdef.snapshots)
+
+        # Initialize executors
+        self._executors = dict()
+        for name, taskdef in self._jobdef.tasks.items():
+            if name in self._executors:
+                raise ExistingTaskName(f"Task with name '{name}' already exists.")
+            self._executors[name] = Executor(name, taskdef, self._jobdef.loggers, lambda x: self._executors[x])
+        
+        # Restore prior states if restart
+        if self._args.restart:
+            for name, state in self._snapshot.load_snapshot().items():
+                if state in (ExecutionState.COMPLETED, ExecutionState.SKIP):
+                    self._executors[name].state = state
+
+        # Process skips
+        for name in self._args.skip:
+            if name not in self._executors:
+                raise ExecutorDoesNotExist(f"Executor with name '{name}' does not exist.")
+            self._executors[name].state = ExecutionState.SKIP
+
+        # Process run-to
+        if self._args.run_to:
+            if self._args.run_to not in self._executors:
+                raise ExecutorDoesNotExist(f"Executor with name '{name}' does not exist.")
+            stack = [self._executors[self._args.run_to]]
+            enabled = set()
+            while stack:
+                cur = stack.pop()
+                print(f"task: {cur.name} | dep: {cur.dependencies}")
+                enabled.add(cur.name)
+                stack.extend([ self._executors[n] for n in cur.dependencies ])
+            for name, ex in self._executors.items():
+                if name not in enabled: ex.state = ExecutionState.SKIP
+
     def update_python_path(self):
         for p in self._jobdef.pypath:
             expanded = os.path.expandvars(os.path.expanduser(p))
@@ -33,34 +68,24 @@ class Flowmancer:
 
     async def initiate(self) -> int:
         self.update_python_path()
-        snapshot = Snapshot(self._jobdef.name, self._jobdef.snapshots)
 
-        snapshot_states = dict()
-        if self._args.restart:
-            snapshot_states = snapshot.load_snapshot()
-        
-        executors = dict()
-        for name, taskdef in self._jobdef.tasks.items():
-            if name in executors:
-                raise ExistingTaskName(f"Task with name '{name}' already exists.")
-            executors[name] = Executor(name, taskdef, self._jobdef.loggers, lambda x: executors[x], snapshot_states.get(name))
         tasks = [
             asyncio.create_task(ex.start())
-            for ex in executors.values()
+            for ex in self._executors.values()
         ]
 
         observer_kwargs = {
-            "executors": executors,
+            "executors": self._executors,
             "jobdef": self._jobdef
         }
         tasks.append(Synchro(**observer_kwargs).start())
-        tasks.append(Checkpoint(snapshot=snapshot, **observer_kwargs).start())
+        tasks.append(Checkpoint(snapshot=self._snapshot, **observer_kwargs).start())
         tasks.append(ProgressBar(**observer_kwargs).start())
         
         await asyncio.gather(*tasks)
         
         failed = 0
-        for ex in executors.values():
+        for ex in self._executors.values():
             if ex.state in (ExecutionState.FAILED, ExecutionState.DEFAULTED):
                 failed += 1
         return failed

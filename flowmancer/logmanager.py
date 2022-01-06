@@ -1,5 +1,5 @@
 from .jobspec.schema.v0_1 import LoggersDefinition
-from .logger.file import FileLogger
+from .loggers.file import FileLogger
 
 class LogManager:
     def __init__(self, task_name: str, logdefs: LoggersDefinition) -> None:
