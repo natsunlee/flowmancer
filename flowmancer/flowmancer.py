@@ -2,11 +2,11 @@ import asyncio, sys, os, inspect
 from pathlib import Path
 from .executor import Executor
 from .typedefs.enums import ExecutionState
-from .jobspec.schema.v0_1 import JobDefinition
+from .typedefs.models import JobDefinition
 from .typedefs.exceptions import ExistingTaskName, MissingJobDef, ExecutorDoesNotExist
 from .jobspec.yaml import YAML
+from .observers.observer import Observer
 from .observers.progressbar import ProgressBar
-from .observers.synchro import Synchro
 from .observers.checkpoint import Checkpoint
 from .snapshot import Snapshot
 from .options import parse_args
@@ -27,13 +27,19 @@ class Flowmancer:
         self._jobdef: JobDefinition = self._jobspec.load(jfile)
         self._snapshot = Snapshot(self._jobdef.name, self._jobdef.snapshots)
 
+        # Update Python path
+        for p in self._jobdef.pypath:
+            expanded = os.path.expandvars(os.path.expanduser(p))
+            if expanded not in sys.path:
+                sys.path.append(expanded)
+
         # Initialize executors
         self._executors = dict()
         for name, taskdef in self._jobdef.tasks.items():
             if name in self._executors:
                 raise ExistingTaskName(f"Task with name '{name}' already exists.")
             self._executors[name] = Executor(name, taskdef, self._jobdef.loggers, lambda x: self._executors[x])
-        
+
         # Restore prior states if restart
         if self._args.restart:
             for name, state in self._snapshot.load_snapshot().items():
@@ -54,33 +60,24 @@ class Flowmancer:
             enabled = set()
             while stack:
                 cur = stack.pop()
-                print(f"task: {cur.name} | dep: {cur.dependencies}")
                 enabled.add(cur.name)
                 stack.extend([ self._executors[n] for n in cur.dependencies ])
             for name, ex in self._executors.items():
                 if name not in enabled: ex.state = ExecutionState.SKIP
 
-    def update_python_path(self):
-        for p in self._jobdef.pypath:
-            expanded = os.path.expandvars(os.path.expanduser(p))
-            if expanded not in sys.path:
-                sys.path.append(expanded)
-
     async def initiate(self) -> int:
-        self.update_python_path()
+        # Initialize global Observer properties
+        Observer.executors = self._executors
+        Observer.jobdef = self._jobdef
 
-        tasks = [
+        tasks = []
+        tasks.append(Observer.init_synchro())
+        tasks.append(Checkpoint(snapshot=self._snapshot).start())
+        tasks.append(ProgressBar().start())
+        tasks.extend([
             asyncio.create_task(ex.start())
             for ex in self._executors.values()
-        ]
-
-        observer_kwargs = {
-            "executors": self._executors,
-            "jobdef": self._jobdef
-        }
-        tasks.append(Synchro(**observer_kwargs).start())
-        tasks.append(Checkpoint(snapshot=self._snapshot, **observer_kwargs).start())
-        tasks.append(ProgressBar(**observer_kwargs).start())
+        ])
         
         await asyncio.gather(*tasks)
         

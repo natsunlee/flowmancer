@@ -2,8 +2,9 @@ import traceback, os
 from multiprocessing.sharedctypes import Value
 from abc import ABC, abstractmethod
 from ..logmanager import LogManager
+from ..lifecycle import Lifecycle
 
-class Task(ABC):
+class Task(ABC, Lifecycle):
 
     def __init__(self, logger: LogManager) -> None:
         self._is_failed = Value("i", 0)
@@ -49,16 +50,4 @@ class Task(ABC):
 
     @abstractmethod
     def run(self) -> None:
-        pass
-    def on_create(self) -> None:
-        # Optional lifecycle method
-        pass
-    def on_success(self) -> None:
-        # Optional lifecycle method
-        pass
-    def on_failure(self) -> None:
-        # Optional lifecycle method
-        pass
-    def on_destroy(self) -> None:
-        # Optional lifecycle method
         pass

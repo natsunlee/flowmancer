@@ -3,7 +3,6 @@ from .observer import Observer
 
 class Checkpoint(Observer):
     def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
         self._snapshot = kwargs["snapshot"]
         self._checkpoint = 0
     
@@ -18,10 +17,10 @@ class Checkpoint(Observer):
             self._checkpoint = time.time()
             self._write_snapshot()
     
-    def on_destroy(self) -> None:
-        if self.failed_executors_exist():
-            # One final write to ensure final status is accurately captured.
-            self._write_snapshot()
-        else:
-            # Checkpoint not needed for successful jobs.
-            self._snapshot.delete()
+    def on_success(self) -> None:
+        # Checkpoint not needed for successful jobs.
+        self._snapshot.delete()
+
+    def on_failure(self) -> None:
+        # One final write to ensure final status is accurately captured.
+        self._write_snapshot()

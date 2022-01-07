@@ -1,4 +1,4 @@
-from .jobspec.schema.v0_1 import LoggersDefinition
+from .typedefs.models import LoggersDefinition
 from .loggers.file import FileLogger
 
 class LogManager:

@@ -4,8 +4,8 @@ from ..typedefs.enums import ExecutionState
 from collections import defaultdict
 
 class Monitor(Observer):
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    
+    def on_create(self) -> None:
         self.executors_by_state = defaultdict(lambda:set())
         for ex in self.executors.values():
             self.executors_by_state[ex.state].add(ex)

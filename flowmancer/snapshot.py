@@ -1,7 +1,7 @@
 import os, pickle
 from typing import Dict
 from pathlib import Path
-from .jobspec.schema.v0_1 import SnapshotsDefinition
+from .typedefs.models import SnapshotsDefinition
 from .typedefs.enums import ExecutionState
 
 class Snapshot:

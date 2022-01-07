@@ -3,28 +3,50 @@ from abc import ABC, abstractmethod
 from typing import Dict
 from ..typedefs.enums import ExecutionState
 from ..executor import Executor
-from flowmancer.jobspec.schema.v0_1 import JobDefinition
+from ..typedefs.models import JobDefinition
+from ..lifecycle import Lifecycle
 
-_root_event = asyncio.Event()
+class Observer(ABC, Lifecycle):
+    _root_event = asyncio.Event()
+    executors: Dict[str, Executor]
+    jobdef: JobDefinition
+    sleep_time = 0.5
 
-class Observer(ABC):
-    def __init__(self, **kwargs) -> None:
-        self._sleep_time = kwargs.get("sleep_time", 0.5)
-        self.executors: Dict[str, Executor] = kwargs["executors"]
-        self.jobdef: JobDefinition = kwargs["jobdef"]
+    @classmethod
+    async def init_synchro(cls) -> None:
+        pending = set(cls.executors.values())
+        while pending:
+            for ex in pending.copy():
+                if not ex.is_alive:
+                    pending.remove(ex)
+            await asyncio.sleep(cls.sleep_time)
+        cls._root_event.set()
 
-    async def sleep(self, seconds: int = -1) -> None:
-        if seconds < 0:
-            seconds = self._sleep_time
-        await asyncio.sleep(seconds)
+    @property
+    def executors(self) -> Dict[str, Executor]:
+        return self.__class__.executors
+    @property
+    def jobdef(self) -> JobDefinition:
+        return self.__class__.jobdef
 
-    async def start(self) -> None:
-        while not _root_event.is_set():
+    async def start(self, sleep_seconds: int = -1) -> None:
+        if sleep_seconds <= 0:
+            sleep_seconds = self.__class__.sleep_time
+
+        self.on_create()
+        
+        while not self.__class__._root_event.is_set():
             self.update()
-            await asyncio.sleep(self._sleep_time)
+            await asyncio.sleep(sleep_seconds)
+        
+        if self._failed_executors_exist():
+            self.on_failure()
+        else:
+            self.on_success()
+        
         self.on_destroy()
     
-    def failed_executors_exist(self) -> bool:
+    def _failed_executors_exist(self) -> bool:
         for ex in self.executors.values():
             if ex.state == ExecutionState.FAILED:
                 return True
@@ -32,8 +54,4 @@ class Observer(ABC):
 
     @abstractmethod
     def update(self) -> None:
-        pass
-
-    def on_destroy(self) -> None:
-        # Optional cleanup method.
         pass

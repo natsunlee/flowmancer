@@ -2,7 +2,7 @@ import asyncio, multiprocessing, time, importlib
 from typing import Callable
 from .typedefs.enums import ExecutionState
 from .tasks.task import Task
-from .jobspec.schema.v0_1 import LoggersDefinition, TaskDefinition
+from .typedefs.models import LoggersDefinition, TaskDefinition
 from .logmanager import LogManager
 
 class Executor:

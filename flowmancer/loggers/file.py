@@ -1,6 +1,6 @@
 import logging, os
 from datetime import datetime
-from ..jobspec.schema.v0_1 import FileLoggerDefinition
+from ..typedefs.models import FileLoggerDefinition
 from .logger import Logger
 
 class FileLogger(Logger):

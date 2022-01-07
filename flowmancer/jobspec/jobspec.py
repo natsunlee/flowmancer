@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from .schema.v0_1 import JobDefinition
+from ..typedefs.models import JobDefinition
 
 class JobSpec(ABC):
     @abstractmethod

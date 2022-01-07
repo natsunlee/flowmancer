@@ -1,6 +1,6 @@
 import yaml
 from .jobspec import JobSpec
-from .schema.v0_1 import JobDefinition
+from ..typedefs.models import JobDefinition
 
 class YAML(JobSpec):
     def load(self, filename: str) -> JobDefinition:

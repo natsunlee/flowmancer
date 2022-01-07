@@ -3,8 +3,8 @@ from tqdm import tqdm
 from ..typedefs.enums import ExecutionState
 
 class ProgressBar(Observer):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    
+    def on_create(self) -> None:
         self.pending = set(self.executors.values())
         self.total = len(self.pending)
         self.failed = 0
