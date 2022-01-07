@@ -9,9 +9,9 @@ from ..lifecycle import Lifecycle
 class Observer(ABC, Lifecycle):
     _root_event = asyncio.Event()
     executors: Dict[str, Executor]
-    jobdef: JobDefinition
     sleep_time = 0.5
 
+    # Required Observers
     @classmethod
     async def init_synchro(cls) -> None:
         pending = set(cls.executors.values())

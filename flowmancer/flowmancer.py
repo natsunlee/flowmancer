@@ -68,7 +68,6 @@ class Flowmancer:
     async def initiate(self) -> int:
         # Initialize global Observer properties
         Observer.executors = self._executors
-        Observer.jobdef = self._jobdef
 
         tasks = []
         tasks.append(Observer.init_synchro())
