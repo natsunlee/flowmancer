@@ -8,6 +8,9 @@ from .jobspec.yaml import YAML
 from .observers.observer import Observer
 from .observers.progressbar import ProgressBar
 from .observers.checkpoint import Checkpoint
+from .observers.notifications.slack import SlackNotification
+from .observers.notifications.pushover import PushoverNotification
+from .observers.notifications.email import EmailNotification
 from .snapshot import Snapshot
 from .options import parse_args
 
@@ -70,9 +73,9 @@ class Flowmancer:
         Observer.executors = self._executors
 
         tasks = []
-        tasks.append(Observer.init_synchro())
-        tasks.append(Checkpoint(snapshot=self._snapshot).start())
-        tasks.append(ProgressBar().start())
+        tasks.append(asyncio.create_task(Observer.init_synchro()))
+        tasks.append(asyncio.create_task(Checkpoint(snapshot=self._snapshot).start()))
+        tasks.append(asyncio.create_task(ProgressBar().start()))
         tasks.extend([
             asyncio.create_task(ex.start())
             for ex in self._executors.values()

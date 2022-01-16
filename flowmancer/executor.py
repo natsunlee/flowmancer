@@ -13,7 +13,7 @@ class Executor:
         resolve_dependency: Callable,
         restore_state: ExecutionState = None
     ) -> None:
-        self._event: asyncio.Event
+        self._event: asyncio.Event = None
         self.name = name
         self._logger = LogManager(name, logsdef)
         self._resolve_dependency = resolve_dependency
@@ -32,7 +32,7 @@ class Executor:
     @property
     def is_alive(self) -> bool:
         if self._event is None:
-            return False
+            return True
         return not self._event.is_set()
 
     @property
