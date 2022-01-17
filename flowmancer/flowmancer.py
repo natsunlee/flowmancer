@@ -1,5 +1,6 @@
 import asyncio, sys, os, inspect
 from pathlib import Path
+from collections import defaultdict
 from .executor import Executor
 from .typedefs.enums import ExecutionState
 from .typedefs.models import JobDefinition
@@ -33,12 +34,16 @@ class Flowmancer:
             if expanded not in sys.path:
                 sys.path.append(expanded)
 
-        # Initialize executors
+        # Initialize executors; keep track of children temporarily for run-from processing
         self._executors = dict()
+        children = defaultdict(lambda:set())
         for name, taskdef in self._jobdef.tasks.items():
             if name in self._executors:
                 raise ExistingTaskName(f"Task with name '{name}' already exists.")
-            self._executors[name] = Executor(name, taskdef, self._jobdef.loggers, lambda x: self._executors[x])
+            ex = Executor(name, taskdef, self._jobdef.loggers, lambda x: self._executors[x])
+            self._executors[name] = ex
+            for n in ex.dependencies:
+                children[n].add(ex.name)
 
         # Restore prior states if restart
         if self._args.restart:
@@ -55,13 +60,26 @@ class Flowmancer:
         # Process run-to
         if self._args.run_to:
             if self._args.run_to not in self._executors:
-                raise ExecutorDoesNotExist(f"Executor with name '{name}' does not exist.")
+                raise ExecutorDoesNotExist(f"Executor with name '{self._args.run_to}' does not exist.")
             stack = [self._executors[self._args.run_to]]
             enabled = set()
             while stack:
                 cur = stack.pop()
                 enabled.add(cur.name)
                 stack.extend([ self._executors[n] for n in cur.dependencies ])
+            for name, ex in self._executors.items():
+                if name not in enabled: ex.state = ExecutionState.SKIP
+        
+        # Process run-from
+        if self._args.run_from:
+            if self._args.run_from not in self._executors:
+                raise ExecutorDoesNotExist(f"Executor with name '{self._args.run_from}' does not exist.")
+            stack = [self._executors[self._args.run_from]]
+            enabled = set()
+            while stack:
+                cur = stack.pop()
+                enabled.add(cur.name)
+                stack.extend([ self._executors[n] for n in children[cur.name] ])
             for name, ex in self._executors.items():
                 if name not in enabled: ex.state = ExecutionState.SKIP
 
