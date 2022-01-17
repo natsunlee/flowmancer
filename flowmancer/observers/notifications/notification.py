@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from typing import Dict
+from datetime import datetime
 from collections import defaultdict
 from ..observer import Observer
 from ...typedefs.enums import ExecutionState
@@ -21,10 +22,10 @@ class Notification(Observer):
         pass
 
     def on_create(self) -> None:
-        self.send_notification("STARTING", "Initiating Job")
+        self.send_notification("Flowmancer Job Notification: STARTING", f"Job initiated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     def on_success(self) -> None:
-        self.send_notification("SUCCESS", "Final Status: SUCCESS")
+        self.send_notification("Flowmancer Job Notification: SUCCESS", f"Job completed successfully at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     def on_failure(self) -> None:
-        self.send_notification("FAILURE", "Final Status: FAILURE")
+        self.send_notification("Flowmancer Job Notification: FAILURE", f"Job failed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

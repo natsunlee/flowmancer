@@ -14,6 +14,7 @@ class PushoverNotification(Notification):
           urllib.parse.urlencode({
             "token": self._app_token,
             "user": self._user_key,
+            "title": title,
             "message": msg
           }), { "Content-type": "application/x-www-form-urlencoded" })
         conn.getresponse()

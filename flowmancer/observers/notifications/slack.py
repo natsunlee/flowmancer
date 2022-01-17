@@ -11,6 +11,13 @@ class SlackNotification(Notification):
     def send_notification(self, title: str, msg: str) -> None:
         requests.post(
             self._webhook,
-            data = json.dumps({ 'text': msg }),
+            data = json.dumps({
+                "text": title,
+                "attachments": [
+                    {
+                        "text": msg
+                    }
+                ]
+            }),
             headers = {'Content-Type': 'application/json'}
         )
