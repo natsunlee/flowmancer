@@ -47,6 +47,8 @@ class Task(ABC, Lifecycle):
         except Exception:
             print(traceback.format_exc())
             self.is_failed = True
+        finally:
+            self.logger.cleanup()
 
     @abstractmethod
     def run(self) -> None:

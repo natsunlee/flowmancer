@@ -11,6 +11,10 @@ class LogManager:
     def prepare(self) -> None:
         for l in self._loggers:
             l.prepare()
+    
+    def cleanup(self) -> None:
+        for l in self._loggers:
+            l.cleanup()
 
     def debug(self, msg: str) -> None:
         for l in self._loggers:

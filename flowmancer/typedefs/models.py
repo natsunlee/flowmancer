@@ -3,6 +3,7 @@ from typing import List, Dict, Optional, Any
 
 class FileLoggerDefinition(BaseModel):
     path: str
+    retention_days: Optional[int] = -1
 
 class LoggersDefinition(BaseModel):
     file: Optional[FileLoggerDefinition]

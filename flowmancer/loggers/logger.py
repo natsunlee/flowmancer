@@ -4,6 +4,9 @@ class Logger(ABC):
     def prepare(self) -> None:
         # Optional
         pass
+    def cleanup(self) -> None:
+        # Optional
+        pass
     @abstractmethod
     def debug(self, msg: str) -> None:
         pass
