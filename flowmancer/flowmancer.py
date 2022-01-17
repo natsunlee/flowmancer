@@ -8,9 +8,6 @@ from .jobspec.yaml import YAML
 from .observers.observer import Observer
 from .observers.progressbar import ProgressBar
 from .observers.checkpoint import Checkpoint
-from .observers.notifications.slack import SlackNotification
-from .observers.notifications.pushover import PushoverNotification
-from .observers.notifications.email import EmailNotification
 from .snapshot import Snapshot
 from .options import parse_args
 
@@ -69,6 +66,9 @@ class Flowmancer:
                 if name not in enabled: ex.state = ExecutionState.SKIP
 
     async def initiate(self) -> int:
+        # Set max parallel limit
+        if self._jobdef.concurrency:
+            Executor.semaphore = asyncio.Semaphore(self._jobdef.concurrency)
         # Initialize global Observer properties
         Observer.executors = self._executors
 

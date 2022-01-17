@@ -6,6 +6,9 @@ from .typedefs.models import LoggersDefinition, TaskDefinition
 from .logmanager import LogManager
 
 class Executor:
+
+    semaphore: asyncio.Semaphore = None
+
     def __init__(
         self, name: str,
         taskdef: TaskDefinition,
@@ -47,6 +50,7 @@ class Executor:
 
     async def start(self) -> None:
         self._event = asyncio.Event()
+        task = self.TaskClass(self._logger)
 
         # In the event of a restart and this task is already complete, return immediately.
         if self.state == ExecutionState.COMPLETED:
@@ -66,10 +70,9 @@ class Executor:
         if self.state == ExecutionState.SKIP:
             self._event.set()
             return
-
-        task = self.TaskClass(self._logger)
-
+        
         while self._attempts < self.max_attempts and self.state == ExecutionState.PENDING:
+            if self.__class__.semaphore: await self.__class__.semaphore.acquire()
             self.state = ExecutionState.RUNNING
             self._start_time = time.time()
             self._attempts += 1
@@ -79,8 +82,10 @@ class Executor:
             loop = asyncio.get_running_loop()
             await asyncio.gather(loop.run_in_executor(None, proc.join))
             self._end_time = time.time()
-            
+            if self.__class__.semaphore: self.__class__.semaphore.release()
+
             if task.is_failed and (self._attempts < self.max_attempts):
+                self.state = ExecutionState.PENDING
                 await asyncio.sleep(self.backoff)
 
         self.state = ExecutionState.FAILED if task.is_failed else ExecutionState.COMPLETED

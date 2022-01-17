@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 
 class FileLoggerDefinition(BaseModel):
@@ -22,6 +22,7 @@ class SnapshotsDefinition(BaseModel):
 class JobDefinition(BaseModel):
     version: float
     name: str
+    concurrency: Optional[int]
     tasks: Dict[str, TaskDefinition]
     pypath: Optional[List[str]] = []
     loggers: Optional[LoggersDefinition] = LoggersDefinition()
