@@ -1,7 +1,8 @@
-from .typedefs.models import LoggersDefinition
-from .loggers.file import FileLogger
+from ..typedefs.models import LoggersDefinition
+from ..loggers.file import FileLogger
 
 class LogManager:
+
     def __init__(self, task_name: str, logdefs: LoggersDefinition) -> None:
         self._loggers = []
         for tp, detl in logdefs:

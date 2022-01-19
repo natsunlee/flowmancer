@@ -1,7 +1,7 @@
 import traceback, os
 from multiprocessing.sharedctypes import Value
 from abc import ABC, abstractmethod
-from ..logmanager import LogManager
+from ..managers.logmanager import LogManager
 from ..lifecycle import Lifecycle
 
 class Task(ABC, Lifecycle):

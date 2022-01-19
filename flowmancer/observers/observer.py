@@ -1,14 +1,15 @@
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Dict
+from ..managers.executormanager import ExecutorManager
 from ..typedefs.enums import ExecutionState
-from ..executor import Executor
+from ..executors.executor import Executor
 from ..typedefs.models import JobDefinition
 from ..lifecycle import Lifecycle
 
 class Observer(ABC, Lifecycle):
     _root_event = asyncio.Event()
-    executors: Dict[str, Executor]
+    executors: ExecutorManager
     sleep_time = 0.5
 
     # Required Observers
@@ -39,18 +40,15 @@ class Observer(ABC, Lifecycle):
             self.update()
             await asyncio.sleep(sleep_seconds)
         
-        if self._failed_executors_exist():
+        if self.executors.num_executors_in_state(
+            ExecutionState.FAILED,
+            ExecutionState.DEFAULTED
+        ):
             self.on_failure()
         else:
             self.on_success()
         
         self.on_destroy()
-    
-    def _failed_executors_exist(self) -> bool:
-        for ex in self.executors.values():
-            if ex.state == ExecutionState.FAILED:
-                return True
-        return False
 
     @abstractmethod
     def update(self) -> None:

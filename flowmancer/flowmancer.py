@@ -1,10 +1,10 @@
 import asyncio, sys, os, inspect
 from pathlib import Path
-from collections import defaultdict
-from .executor import Executor
+from .managers.executormanager import ExecutorManager
+from .executors.executor import Executor
 from .typedefs.enums import ExecutionState
 from .typedefs.models import JobDefinition
-from .typedefs.exceptions import ExistingTaskName, MissingJobDef, ExecutorDoesNotExist
+from .typedefs.exceptions import MissingJobDef, ExecutorDoesNotExist
 from .jobspec.yaml import YAML
 from .observers.observer import Observer
 from .observers.progressbar import ProgressBar
@@ -34,53 +34,44 @@ class Flowmancer:
             if expanded not in sys.path:
                 sys.path.append(expanded)
 
-        # Initialize executors; keep track of children temporarily for run-from processing
-        self._executors = dict()
-        children = defaultdict(lambda:set())
-        for name, taskdef in self._jobdef.tasks.items():
-            if name in self._executors:
-                raise ExistingTaskName(f"Task with name '{name}' already exists.")
-            ex = Executor(name, taskdef, self._jobdef.loggers, lambda x: self._executors[x])
-            self._executors[name] = ex
-            for n in ex.dependencies:
-                children[n].add(ex.name)
+        self._executor_manager = ExecutorManager(self._jobdef)
 
         # Restore prior states if restart
         if self._args.restart:
             for name, state in self._snapshot.load_snapshot().items():
                 if state in (ExecutionState.COMPLETED, ExecutionState.SKIP):
-                    self._executors[name].state = state
+                    self._executor_manager.set_state_for_executor(name, state)
 
         # Process skips
         for name in self._args.skip:
-            if name not in self._executors:
+            if name not in self._executor_manager:
                 raise ExecutorDoesNotExist(f"Executor with name '{name}' does not exist.")
-            self._executors[name].state = ExecutionState.SKIP
+            self._executor_manager.set_state_for_executor(name, ExecutionState.SKIP)
 
         # Process run-to
         if self._args.run_to:
-            if self._args.run_to not in self._executors:
+            if self._args.run_to not in self._executor_manager:
                 raise ExecutorDoesNotExist(f"Executor with name '{self._args.run_to}' does not exist.")
-            stack = [self._executors[self._args.run_to]]
+            stack = [self._executor_manager[self._args.run_to]]
             enabled = set()
             while stack:
                 cur = stack.pop()
                 enabled.add(cur.name)
-                stack.extend([ self._executors[n] for n in cur.dependencies ])
-            for name, ex in self._executors.items():
+                stack.extend([ self._executor_manager[n] for n in cur.dependencies ])
+            for name, ex in self._executor_manager.items():
                 if name not in enabled: ex.state = ExecutionState.SKIP
         
         # Process run-from
         if self._args.run_from:
-            if self._args.run_from not in self._executors:
+            if self._args.run_from not in self._executor_manager:
                 raise ExecutorDoesNotExist(f"Executor with name '{self._args.run_from}' does not exist.")
-            stack = [self._executors[self._args.run_from]]
+            stack = [self._executor_manager[self._args.run_from]]
             enabled = set()
             while stack:
                 cur = stack.pop()
                 enabled.add(cur.name)
-                stack.extend([ self._executors[n] for n in children[cur.name] ])
-            for name, ex in self._executors.items():
+                stack.extend([ self._executor_manager[n] for n in self._executor_manager.get_children(cur.name) ])
+            for name, ex in self._executor_manager.items():
                 if name not in enabled: ex.state = ExecutionState.SKIP
 
     async def initiate(self) -> int:
@@ -88,7 +79,7 @@ class Flowmancer:
         if self._jobdef.concurrency:
             Executor.semaphore = asyncio.Semaphore(self._jobdef.concurrency)
         # Initialize global Observer properties
-        Observer.executors = self._executors
+        Observer.executors = self._executor_manager
 
         tasks = []
         tasks.append(asyncio.create_task(Observer.init_synchro()))
@@ -96,16 +87,15 @@ class Flowmancer:
         tasks.append(asyncio.create_task(ProgressBar().start()))
         tasks.extend([
             asyncio.create_task(ex.start())
-            for ex in self._executors.values()
+            for ex in self._executor_manager.values()
         ])
         
         await asyncio.gather(*tasks)
         
-        failed = 0
-        for ex in self._executors.values():
-            if ex.state in (ExecutionState.FAILED, ExecutionState.DEFAULTED):
-                failed += 1
-        return failed
+        return self._executor_manager.num_executors_in_state(
+            ExecutionState.FAILED,
+            ExecutionState.DEFAULTED
+        )
     
     def start(self) -> int:
         return asyncio.run(self.initiate())

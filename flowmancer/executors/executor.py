@@ -1,11 +1,12 @@
-import asyncio, multiprocessing, time, importlib
+import asyncio, time, importlib
+from abc import ABC, abstractmethod
 from typing import Callable
-from .typedefs.enums import ExecutionState
-from .tasks.task import Task
-from .typedefs.models import LoggersDefinition, TaskDefinition
-from .logmanager import LogManager
+from ..typedefs.enums import ExecutionState
+from ..tasks.task import Task
+from ..typedefs.models import LoggersDefinition, TaskDefinition
+from ..managers.logmanager import LogManager
 
-class Executor:
+class Executor(ABC):
 
     semaphore: asyncio.Semaphore = None
 
@@ -14,16 +15,15 @@ class Executor:
         taskdef: TaskDefinition,
         logsdef: LoggersDefinition,
         resolve_dependency: Callable,
-        restore_state: ExecutionState = None
+        notify_state_transition: Callable
     ) -> None:
         self._event: asyncio.Event = None
         self.name = name
         self._logger = LogManager(name, logsdef)
         self._resolve_dependency = resolve_dependency
+        self._notify_state_transition = notify_state_transition
 
-        self.state = ExecutionState.PENDING
-        if restore_state in (ExecutionState.COMPLETED, ExecutionState.SKIP):
-            self.state = restore_state
+        self._state = ExecutionState.PENDING
 
         self.dependencies = taskdef.dependencies
         self.module = taskdef.module
@@ -31,7 +31,15 @@ class Executor:
         self.max_attempts = taskdef.max_attempts
         self.backoff = taskdef.backoff
         self._attempts = 0
-    
+
+    @property
+    def state(self) -> ExecutionState:
+        return self._state
+    @state.setter
+    def state(self, val: ExecutionState) -> None:
+        self._notify_state_transition(self.name, self._state, val)
+        self._state = val
+
     @property
     def is_alive(self) -> bool:
         if self._event is None:
@@ -77,10 +85,7 @@ class Executor:
             self._start_time = time.time()
             self._attempts += 1
 
-            proc = multiprocessing.Process(target=task.run_lifecycle, daemon=False)
-            proc.start()
-            loop = asyncio.get_running_loop()
-            await asyncio.gather(loop.run_in_executor(None, proc.join))
+            await self.execute(task)
             self._end_time = time.time()
             if self.__class__.semaphore: self.__class__.semaphore.release()
 
@@ -90,3 +95,7 @@ class Executor:
 
         self.state = ExecutionState.FAILED if task.is_failed else ExecutionState.COMPLETED
         self._event.set()
+    
+    @abstractmethod
+    async def execute(self, task: Task) -> None:
+        pass
