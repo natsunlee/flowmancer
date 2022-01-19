@@ -1,6 +1,6 @@
 import asyncio, time, importlib
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, List
 from ..typedefs.enums import ExecutionState
 from ..tasks.task import Task
 from ..typedefs.models import LoggersDefinition, TaskDefinition
@@ -22,14 +22,8 @@ class Executor(ABC):
         self._logger = LogManager(name, logsdef)
         self._resolve_dependency = resolve_dependency
         self._notify_state_transition = notify_state_transition
-
         self._state = ExecutionState.PENDING
-
-        self.dependencies = taskdef.dependencies
-        self.module = taskdef.module
-        self.task = taskdef.task
-        self.max_attempts = taskdef.max_attempts
-        self.backoff = taskdef.backoff
+        self._taskdef = taskdef
         self._attempts = 0
 
     @property
@@ -41,6 +35,10 @@ class Executor(ABC):
         self._state = val
 
     @property
+    def dependencies(self) -> List[str]:
+        return self._taskdef.dependencies
+
+    @property
     def is_alive(self) -> bool:
         if self._event is None:
             return True
@@ -48,9 +46,9 @@ class Executor(ABC):
 
     @property
     def TaskClass(self) -> Task:
-        task_class = getattr(importlib.import_module(self.module), self.task)
+        task_class = getattr(importlib.import_module(self._taskdef.module), self._taskdef.task)
         if not issubclass(task_class, Task):
-            raise TypeError(f"{self.module}.{self.task} is not an extension of Task")
+            raise TypeError(f"{self._taskdef.module}.{self._taskdef.task} is not an extension of Task")
         return task_class
     
     async def wait(self) -> None:
@@ -58,7 +56,7 @@ class Executor(ABC):
 
     async def start(self) -> None:
         self._event = asyncio.Event()
-        task = self.TaskClass(self._logger)
+        task = self.TaskClass(self._logger, self._taskdef.kwargs)
 
         # In the event of a restart and this task is already complete, return immediately.
         if self.state == ExecutionState.COMPLETED:
@@ -66,7 +64,7 @@ class Executor(ABC):
             return
 
         # Wait for the completion of prior/dependency tasks.
-        for dep_name in self.dependencies:
+        for dep_name in self._taskdef.dependencies:
             d = self._resolve_dependency(dep_name)
             await d.wait()
             if d.state == ExecutionState.FAILED:
@@ -79,7 +77,7 @@ class Executor(ABC):
             self._event.set()
             return
         
-        while self._attempts < self.max_attempts and self.state == ExecutionState.PENDING:
+        while self._attempts < self._taskdef.max_attempts and self.state == ExecutionState.PENDING:
             if self.__class__.semaphore: await self.__class__.semaphore.acquire()
             self.state = ExecutionState.RUNNING
             self._start_time = time.time()
@@ -89,9 +87,9 @@ class Executor(ABC):
             self._end_time = time.time()
             if self.__class__.semaphore: self.__class__.semaphore.release()
 
-            if task.is_failed and (self._attempts < self.max_attempts):
+            if task.is_failed and (self._attempts < self._taskdef.max_attempts):
                 self.state = ExecutionState.PENDING
-                await asyncio.sleep(self.backoff)
+                await asyncio.sleep(self._taskdef.backoff)
 
         self.state = ExecutionState.FAILED if task.is_failed else ExecutionState.COMPLETED
         self._event.set()
