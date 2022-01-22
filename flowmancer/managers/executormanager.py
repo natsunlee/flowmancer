@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 from typing import Set, Any, List
 from ..executors.executor import Executor
@@ -46,6 +47,12 @@ class ExecutorManager:
     def _notify_state_transition(self, name: str, from_state: ExecutionState, to_state: ExecutionState) -> None:
         self._states[from_state].remove(name)
         self._states[to_state].add(name)
+
+    def create_tasks(self) -> List[asyncio.Task]:
+        return [
+            asyncio.create_task(ex.start())
+            for ex in self.executors.values()
+        ]
 
     # Map dictionary methods to Executors dictionary
     def __contains__(self, key: str):

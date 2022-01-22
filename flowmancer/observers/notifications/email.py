@@ -1,23 +1,16 @@
-import smtplib, socket, getpass
+import smtplib
+from typing import Dict
 from email.message import EmailMessage
 from .notification import Notification
 
 class EmailNotification(Notification):
 
-    def __init__(
-        self,
-        recipient: str,
-        smtp_host: str = "localhost",
-        smtp_port: int = 0,
-        sender_user: str = getpass.getuser(),
-        sender_host: str = socket.gethostname()
-    ) -> None:
-        self._recipient = recipient
-        self._smtp_host = smtp_host
-        self._smtp_port = smtp_port
-        self._sender_user = sender_user
-        self._sender_host = sender_host
-        self._checkpoint = 0
+    def __init__(self, **kwargs: Dict[str, str]) -> None:
+        self._recipient = kwargs["recipient"]
+        self._smtp_host = kwargs["smtp_host"]
+        self._smtp_port = kwargs["smtp_port"]
+        self._sender_user = kwargs["sender_user"]
+        self._sender_host = kwargs["sender_host"]
     
     def send_notification(self, title: str, msg: str) -> None:
         em = EmailMessage()

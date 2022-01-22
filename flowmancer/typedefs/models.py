@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Union
 
 class FileLoggerDefinition(BaseModel):
     path: str
@@ -14,7 +14,12 @@ class TaskDefinition(BaseModel):
     dependencies: Optional[List[str]] = []
     max_attempts: Optional[int] = 1
     backoff: Optional[int] = 0
-    kwargs: Optional[Dict[str, Any]] = dict()
+    kwargs: Optional[Dict[str, Union[str, int]]] = dict()
+
+class ObserverDefinition(BaseModel):
+    module: str
+    observer: str
+    kwargs: Optional[Dict[str, Union[str, int]]] = dict()
 
 class SnapshotsDefinition(BaseModel):
     path: str
@@ -27,3 +32,9 @@ class JobDefinition(BaseModel):
     pypath: Optional[List[str]] = []
     loggers: Optional[LoggersDefinition] = LoggersDefinition()
     snapshots: Optional[SnapshotsDefinition] = SnapshotsDefinition(path="./.flowmancer")
+    observers: Optional[Dict[str, ObserverDefinition]] = {
+        "progressbar": ObserverDefinition(
+            module="flowmancer.observers.progressbar",
+            observer="ProgressBar"
+        )
+    }

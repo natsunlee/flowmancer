@@ -1,6 +1,7 @@
 import asyncio, sys, os, inspect
 from pathlib import Path
 from .managers.executormanager import ExecutorManager
+from .managers.observermanager import ObserverManager
 from .executors.executor import Executor
 from .typedefs.enums import ExecutionState
 from .typedefs.models import JobDefinition
@@ -80,15 +81,13 @@ class Flowmancer:
             Executor.semaphore = asyncio.Semaphore(self._jobdef.concurrency)
         # Initialize global Observer properties
         Observer.executors = self._executor_manager
+        observer_manager = ObserverManager(self._jobdef.observers)
 
         tasks = []
         tasks.append(asyncio.create_task(Observer.init_synchro()))
         tasks.append(asyncio.create_task(Checkpoint(snapshot=self._snapshot).start()))
-        tasks.append(asyncio.create_task(ProgressBar().start()))
-        tasks.extend([
-            asyncio.create_task(ex.start())
-            for ex in self._executor_manager.values()
-        ])
+        tasks.extend(observer_manager.create_tasks())
+        tasks.extend(self._executor_manager.create_tasks())
         
         await asyncio.gather(*tasks)
         
