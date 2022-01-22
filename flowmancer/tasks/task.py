@@ -7,6 +7,8 @@ from ..lifecycle import Lifecycle
 
 class Task(ABC, Lifecycle):
 
+    restart = False
+
     def __init__(self, logger: LogManager, kwargs: Dict[str, Any]) -> None:
         self._is_failed = Value("i", 0)
         self.logger = logger
@@ -24,6 +26,10 @@ class Task(ABC, Lifecycle):
     def is_failed(self) -> bool:
         return bool(self._is_failed.value)
     
+    @property
+    def is_restart(self) -> bool:
+        return self.__class__.restart
+    
     @is_failed.setter
     def is_failed(self, val: bool) -> None:
         self._is_failed.value = 1 if val else 0
@@ -36,6 +42,10 @@ class Task(ABC, Lifecycle):
             os.dup2(nullfd, 2)
 
             self._exec_lifecycle_stage(self.on_create)
+
+            if self.is_restart:
+                self._exec_lifecycle_stage(self.on_restart)
+
             self._exec_lifecycle_stage(self.run)
 
             if self.is_failed:

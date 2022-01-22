@@ -10,6 +10,7 @@ from ..lifecycle import Lifecycle
 class Observer(ABC, Lifecycle):
     _root_event = asyncio.Event()
     executors: ExecutorManager
+    restart = False
     sleep_time = 0.5
 
     # Required Observers
@@ -29,12 +30,18 @@ class Observer(ABC, Lifecycle):
     @property
     def jobdef(self) -> JobDefinition:
         return self.__class__.jobdef
+    @property
+    def is_restart(self) -> bool:
+        return self.__class__.restart
 
     async def start(self, sleep_seconds: int = -1) -> None:
         if sleep_seconds <= 0:
             sleep_seconds = self.__class__.sleep_time
 
         self.on_create()
+
+        if self.is_restart:
+            self.on_restart()
         
         while not self.__class__._root_event.is_set():
             self.update()

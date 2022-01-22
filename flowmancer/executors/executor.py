@@ -9,6 +9,7 @@ from ..managers.logmanager import LogManager
 class Executor(ABC):
 
     semaphore: asyncio.Semaphore = None
+    restart = False
 
     def __init__(
         self, name: str,
@@ -33,6 +34,10 @@ class Executor(ABC):
     def state(self, val: ExecutionState) -> None:
         self._notify_state_transition(self.name, self._state, val)
         self._state = val
+    
+    @property
+    def is_restart(self) -> bool:
+        return self.__class__.restart
 
     @property
     def dependencies(self) -> List[str]:

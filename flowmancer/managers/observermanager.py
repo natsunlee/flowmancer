@@ -2,7 +2,6 @@ import importlib, asyncio
 from typing import List
 from ..typedefs.models import ObserverDefinition
 from ..observers.observer import Observer
-from ..observers.checkpoint import Checkpoint
 
 class ObserverManager:
 
@@ -20,6 +19,8 @@ class ObserverManager:
     
     def create_tasks(self) -> List[asyncio.Task]:
         return [
+            asyncio.create_task(Observer.init_synchro())
+        ] + [
             asyncio.create_task(obs.start())
             for obs in self._observers
         ]

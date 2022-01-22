@@ -8,9 +8,6 @@ from .typedefs.models import JobDefinition
 from .typedefs.exceptions import MissingJobDef, ExecutorDoesNotExist
 from .jobspec.yaml import YAML
 from .observers.observer import Observer
-from .observers.progressbar import ProgressBar
-from .observers.checkpoint import Checkpoint
-from .snapshot import Snapshot
 from .options import parse_args
 
 class Flowmancer:
@@ -27,7 +24,6 @@ class Flowmancer:
         # Read job definition
         self._jobspec = YAML()
         self._jobdef: JobDefinition = self._jobspec.load(jfile)
-        self._snapshot = Snapshot(self._jobdef.name, self._jobdef.snapshots)
 
         # Update Python path
         for p in self._jobdef.pypath:
@@ -37,11 +33,9 @@ class Flowmancer:
 
         self._executor_manager = ExecutorManager(self._jobdef)
 
-        # Restore prior states if restart
         if self._args.restart:
-            for name, state in self._snapshot.load_snapshot().items():
-                if state in (ExecutionState.COMPLETED, ExecutionState.SKIP):
-                    self._executor_manager.set_state_for_executor(name, state)
+            Observer.restart = True
+            Executor.restart = True
 
         # Process skips
         for name in self._args.skip:
@@ -84,8 +78,6 @@ class Flowmancer:
         observer_manager = ObserverManager(self._jobdef.observers)
 
         tasks = []
-        tasks.append(asyncio.create_task(Observer.init_synchro()))
-        tasks.append(asyncio.create_task(Checkpoint(snapshot=self._snapshot).start()))
         tasks.extend(observer_manager.create_tasks())
         tasks.extend(self._executor_manager.create_tasks())
         

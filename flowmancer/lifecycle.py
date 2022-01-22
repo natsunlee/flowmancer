@@ -2,6 +2,9 @@ class Lifecycle:
     def on_create(self) -> None:
         # Optional lifecycle method
         pass
+    def on_restart(self) -> None:
+        # Optional lifecycle method
+        pass
     def on_success(self) -> None:
         # Optional lifecycle method
         pass
