@@ -9,8 +9,9 @@ class Task(ABC, Lifecycle):
 
     restart = False
 
-    def __init__(self, logger: LogManager, args: List[Any], kwargs: Dict[str, Any]) -> None:
+    def __init__(self, stash: Dict[str, Any], logger: LogManager, args: List[Any], kwargs: Dict[str, Any]) -> None:
         self._is_failed = Value("i", 0)
+        self.stash = stash
         self.logger = logger
         self.args = args
         self.kwargs = kwargs

@@ -1,4 +1,5 @@
 import asyncio
+from multiprocessing import Manager
 from collections import defaultdict
 from typing import Set, Any, List
 from ..executors.executor import Executor
@@ -10,15 +11,24 @@ from ..typedefs.enums import ExecutionState
 class ExecutorManager:
 
     def __init__(self, jobdef: JobDefinition) -> None:
+        manager = Manager()
         self.executors = dict()
         self._jobdef = jobdef
         self._children = defaultdict(lambda:set())
         self._states = defaultdict(lambda:set())
+        self.stash = manager.dict()
 
         for name, detl in self._jobdef.tasks.items():
             if name in self.executors:
                 raise ExistingTaskName(f"Task with name '{name}' already exists.")
-            ex = LocalExecutor(name, detl, self._jobdef.loggers, lambda x: self.executors[x], self._notify_state_transition)
+            ex = LocalExecutor(
+                name,
+                detl,
+                self._jobdef.loggers,
+                lambda x: self.executors[x],
+                self._notify_state_transition,
+                self.stash
+            )
             self.executors[name] = ex
             self._states[ex.state].add(ex.name)
             for n in ex.dependencies:

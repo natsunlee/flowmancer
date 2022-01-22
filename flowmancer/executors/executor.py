@@ -12,11 +12,13 @@ class Executor(ABC):
     restart = False
 
     def __init__(
-        self, name: str,
+        self,
+        name: str,
         taskdef: TaskDefinition,
         logsdef: LoggersDefinition,
         resolve_dependency: Callable,
-        notify_state_transition: Callable
+        notify_state_transition: Callable,
+        stash: dict = None
     ) -> None:
         self._event: asyncio.Event = None
         self.name = name
@@ -25,6 +27,7 @@ class Executor(ABC):
         self._notify_state_transition = notify_state_transition
         self._state = ExecutionState.PENDING
         self._taskdef = taskdef
+        self.stash = stash or dict()
         self._attempts = 0
 
     @property
@@ -61,7 +64,12 @@ class Executor(ABC):
 
     async def start(self) -> None:
         self._event = asyncio.Event()
-        task = self.TaskClass(self._logger, self._taskdef.args, self._taskdef.kwargs)
+        task = self.TaskClass(
+            self.stash,
+            self._logger,
+            self._taskdef.args,
+            self._taskdef.kwargs
+        )
 
         # In the event of a restart and this task is already complete, return immediately.
         if self.state == ExecutionState.COMPLETED:

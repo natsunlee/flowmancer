@@ -8,6 +8,7 @@ from ..typedefs.models import JobDefinition
 from ..lifecycle import Lifecycle
 
 class Observer(ABC, Lifecycle):
+
     _root_event = asyncio.Event()
     executors: ExecutorManager
     restart = False

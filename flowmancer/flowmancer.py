@@ -32,6 +32,9 @@ class Flowmancer:
                 sys.path.append(expanded)
 
         self._executor_manager = ExecutorManager(self._jobdef)
+        
+        # Initialize global Observer properties
+        Observer.executors = self._executor_manager
 
         if self._args.restart:
             Observer.restart = True
@@ -73,13 +76,8 @@ class Flowmancer:
         # Set max parallel limit
         if self._jobdef.concurrency:
             Executor.semaphore = asyncio.Semaphore(self._jobdef.concurrency)
-        # Initialize global Observer properties
-        Observer.executors = self._executor_manager
         observer_manager = ObserverManager(self._jobdef.observers)
-
-        tasks = []
-        tasks.extend(observer_manager.create_tasks())
-        tasks.extend(self._executor_manager.create_tasks())
+        tasks = observer_manager.create_tasks() + self._executor_manager.create_tasks()
         
         await asyncio.gather(*tasks)
         

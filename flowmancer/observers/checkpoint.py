@@ -11,9 +11,12 @@ class Checkpoint(Observer):
         self._checkpoint = 0
 
     def on_restart(self) -> None:
-        for name, state in self._load_checkpoint().items():
+        checkpoint = self._load_checkpoint()
+        for name, state in checkpoint["states"].items():
             if state in (ExecutionState.COMPLETED, ExecutionState.SKIP):
                 self.executors.set_state_for_executor(name, state)
+        for k,v in checkpoint["stash"].items():
+            self.executors.stash[k] = v
 
     def update(self) -> None:
         if (time.time() - self._checkpoint) >= 10:
@@ -40,7 +43,7 @@ class Checkpoint(Observer):
             ex.name: ex.state
             for ex in self.executors.values()
         }
-        checkpoint = { "states": states }
+        checkpoint = { "states": states, "stash": self.executors.stash.copy() }
         tmp = self._checkpoint_dir / (self._checkpoint_name+".tmp")
         perm = self._checkpoint_dir / self._checkpoint_name
         pickle.dump(checkpoint, open(tmp, 'wb'))
@@ -53,4 +56,4 @@ class Checkpoint(Observer):
         if not checkpoint_file.exists():
             return dict()
         checkpoint = pickle.load(open(checkpoint_file, "rb"))
-        return checkpoint["states"]
+        return checkpoint
