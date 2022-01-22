@@ -61,7 +61,7 @@ class Executor(ABC):
 
     async def start(self) -> None:
         self._event = asyncio.Event()
-        task = self.TaskClass(self._logger, self._taskdef.kwargs)
+        task = self.TaskClass(self._logger, self._taskdef.args, self._taskdef.kwargs)
 
         # In the event of a restart and this task is already complete, return immediately.
         if self.state == ExecutionState.COMPLETED:

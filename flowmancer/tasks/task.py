@@ -1,6 +1,6 @@
 import traceback, os
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import List, Dict, Any
 from multiprocessing.sharedctypes import Value
 from ..managers.logmanager import LogManager
 from ..lifecycle import Lifecycle
@@ -9,9 +9,10 @@ class Task(ABC, Lifecycle):
 
     restart = False
 
-    def __init__(self, logger: LogManager, kwargs: Dict[str, Any]) -> None:
+    def __init__(self, logger: LogManager, args: List[Any], kwargs: Dict[str, Any]) -> None:
         self._is_failed = Value("i", 0)
         self.logger = logger
+        self.args = args
         self.kwargs = kwargs
 
     def _exec_lifecycle_stage(self, stage) -> None:
