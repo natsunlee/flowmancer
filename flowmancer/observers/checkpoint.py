@@ -15,6 +15,8 @@ class Checkpoint(Observer):
         for name, state in checkpoint["states"].items():
             if state in (ExecutionState.COMPLETED, ExecutionState.SKIP):
                 self.executors.set_state_for_executor(name, state)
+            if state == ExecutionState.FAILED:
+                self.executors.set_restart_flag_for_executor(name)
         for k,v in checkpoint["stash"].items():
             self.executors.stash[k] = v
 
@@ -31,11 +33,8 @@ class Checkpoint(Observer):
         # One final write to ensure final status is accurately captured.
         self._write_checkpoint()
     
-    def _checkpoint_exists(self) -> bool:
-        return (self._checkpoint_dir / self._checkpoint_name).exists()
-
     def _delete_checkpoint(self) -> None:
-        if self._checkpoint_exists():
+        if (self._checkpoint_dir / self._checkpoint_name).exists():
             os.unlink(self._checkpoint_dir / self._checkpoint_name)
 
     def _write_checkpoint(self) -> None:

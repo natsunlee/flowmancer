@@ -7,14 +7,13 @@ from ..lifecycle import Lifecycle
 
 class Task(ABC, Lifecycle):
 
-    restart = False
-
-    def __init__(self, stash: Dict[str, Any], logger: LogManager, args: List[Any], kwargs: Dict[str, Any]) -> None:
+    def __init__(self, stash: Dict[str, Any], logger: LogManager, args: List[Any], kwargs: Dict[str, Any], restart: bool = False) -> None:
         self._is_failed = Value("i", 0)
         self.stash = stash
         self.logger = logger
         self.args = args
         self.kwargs = kwargs
+        self.restart = restart
 
     def _exec_lifecycle_stage(self, stage) -> None:
         try:
@@ -27,10 +26,6 @@ class Task(ABC, Lifecycle):
     @property
     def is_failed(self) -> bool:
         return bool(self._is_failed.value)
-    
-    @property
-    def is_restart(self) -> bool:
-        return self.__class__.restart
     
     @is_failed.setter
     def is_failed(self, val: bool) -> None:
@@ -45,7 +40,7 @@ class Task(ABC, Lifecycle):
 
             self._exec_lifecycle_stage(self.on_create)
 
-            if self.is_restart:
+            if self.restart:
                 self._exec_lifecycle_stage(self.on_restart)
 
             self._exec_lifecycle_stage(self.run)

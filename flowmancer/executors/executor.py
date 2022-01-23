@@ -8,9 +8,6 @@ from ..managers.logmanager import LogManager
 
 class Executor(ABC):
 
-    semaphore: asyncio.Semaphore = None
-    restart = False
-
     def __init__(
         self,
         name: str,
@@ -18,6 +15,7 @@ class Executor(ABC):
         logsdef: LoggersDefinition,
         resolve_dependency: Callable,
         notify_state_transition: Callable,
+        semaphore: asyncio.Semaphore,
         stash: dict = None
     ) -> None:
         self._event: asyncio.Event = None
@@ -29,6 +27,8 @@ class Executor(ABC):
         self._taskdef = taskdef
         self.stash = stash or dict()
         self._attempts = 0
+        self._semaphore = semaphore
+        self.restart = False
 
     @property
     def state(self) -> ExecutionState:
@@ -37,10 +37,6 @@ class Executor(ABC):
     def state(self, val: ExecutionState) -> None:
         self._notify_state_transition(self.name, self._state, val)
         self._state = val
-    
-    @property
-    def is_restart(self) -> bool:
-        return self.__class__.restart
 
     @property
     def dependencies(self) -> List[str]:
@@ -68,7 +64,8 @@ class Executor(ABC):
             self.stash,
             self._logger,
             self._taskdef.args,
-            self._taskdef.kwargs
+            self._taskdef.kwargs,
+            self.restart
         )
 
         # In the event of a restart and this task is already complete, return immediately.
@@ -91,14 +88,14 @@ class Executor(ABC):
             return
         
         while self._attempts < self._taskdef.max_attempts and self.state == ExecutionState.PENDING:
-            if self.__class__.semaphore: await self.__class__.semaphore.acquire()
+            if self._semaphore: await self._semaphore.acquire()
             self.state = ExecutionState.RUNNING
             self._start_time = time.time()
             self._attempts += 1
 
             await self.execute(task)
             self._end_time = time.time()
-            if self.__class__.semaphore: self.__class__.semaphore.release()
+            if self._semaphore: self._semaphore.release()
 
             if task.is_failed and (self._attempts < self._taskdef.max_attempts):
                 self.state = ExecutionState.PENDING

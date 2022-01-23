@@ -17,11 +17,7 @@ class Observer(ABC, Lifecycle):
     # Required Observers
     @classmethod
     async def init_synchro(cls) -> None:
-        pending = set(cls.executors.values())
-        while pending:
-            for ex in pending.copy():
-                if not ex.is_alive:
-                    pending.remove(ex)
+        while cls.executors.get_executors_in_state(ExecutionState.PENDING):
             await asyncio.sleep(cls.sleep_time)
         cls._root_event.set()
 
@@ -43,11 +39,14 @@ class Observer(ABC, Lifecycle):
 
         if self.is_restart:
             self.on_restart()
-        
+
         while not self.__class__._root_event.is_set():
             self.update()
             await asyncio.sleep(sleep_seconds)
-        
+
+        # Final update to allow observers to update once upon full completion.
+        self.update()
+
         if self.executors.num_executors_in_state(
             ExecutionState.FAILED,
             ExecutionState.DEFAULTED
@@ -55,7 +54,7 @@ class Observer(ABC, Lifecycle):
             self.on_failure()
         else:
             self.on_success()
-        
+
         self.on_destroy()
 
     @abstractmethod

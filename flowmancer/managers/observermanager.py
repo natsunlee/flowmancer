@@ -5,8 +5,9 @@ from ..observers.observer import Observer
 
 class ObserverManager:
 
-    def __init__(self, observer_def: ObserverDefinition) -> None:
+    def __init__(self, observer_def: ObserverDefinition, restart: bool = False) -> None:
         self._observers = []
+        self._restart = restart
         for detl in observer_def.values():
             ObsClass = self.get_observer_class(detl.module, detl.observer)
             self._observers.append(ObsClass(**detl.kwargs))

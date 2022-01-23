@@ -16,6 +16,7 @@ class ExecutorManager:
         self._jobdef = jobdef
         self._children = defaultdict(lambda:set())
         self._states = defaultdict(lambda:set())
+        self._semaphore = asyncio.Semaphore(self._jobdef.concurrency) if self._jobdef.concurrency else None
         self.stash = manager.dict()
 
         for name, detl in self._jobdef.tasks.items():
@@ -27,12 +28,16 @@ class ExecutorManager:
                 self._jobdef.loggers,
                 lambda x: self.executors[x],
                 self._notify_state_transition,
+                self._semaphore,
                 self.stash
             )
             self.executors[name] = ex
             self._states[ex.state].add(ex.name)
             for n in ex.dependencies:
                 self._children[n].add(ex.name)
+
+    def set_restart_flag_for_executor(self, name: str) -> None:
+        self.executors[name].restart = True
 
     def set_state_for_executor(self, name: str, to_state: ExecutionState) -> None:
         ex = self.executors[name]

@@ -2,7 +2,6 @@ import asyncio, sys, os, inspect
 from pathlib import Path
 from .managers.executormanager import ExecutorManager
 from .managers.observermanager import ObserverManager
-from .executors.executor import Executor
 from .typedefs.enums import ExecutionState
 from .typedefs.models import JobDefinition
 from .typedefs.exceptions import MissingJobDef, ExecutorDoesNotExist
@@ -25,63 +24,56 @@ class Flowmancer:
         self._jobspec = YAML()
         self._jobdef: JobDefinition = self._jobspec.load(jfile)
 
+    async def initiate(self) -> int:
         # Update Python path
         for p in self._jobdef.pypath:
             expanded = os.path.expandvars(os.path.expanduser(p))
             if expanded not in sys.path:
                 sys.path.append(expanded)
 
-        self._executor_manager = ExecutorManager(self._jobdef)
-        
-        # Initialize global Observer properties
-        Observer.executors = self._executor_manager
+        executor_manager = ExecutorManager(self._jobdef)
+        observer_manager = ObserverManager(self._jobdef.observers, self._args.restart)
 
-        if self._args.restart:
-            Observer.restart = True
-            Executor.restart = True
+        Observer.executors = executor_manager
+        Observer.restart = self._args.restart
 
         # Process skips
         for name in self._args.skip:
-            if name not in self._executor_manager:
+            if name not in executor_manager:
                 raise ExecutorDoesNotExist(f"Executor with name '{name}' does not exist.")
-            self._executor_manager.set_state_for_executor(name, ExecutionState.SKIP)
+            executor_manager.set_state_for_executor(name, ExecutionState.SKIP)
 
         # Process run-to
         if self._args.run_to:
-            if self._args.run_to not in self._executor_manager:
+            if self._args.run_to not in executor_manager:
                 raise ExecutorDoesNotExist(f"Executor with name '{self._args.run_to}' does not exist.")
-            stack = [self._executor_manager[self._args.run_to]]
+            stack = [executor_manager[self._args.run_to]]
             enabled = set()
             while stack:
                 cur = stack.pop()
                 enabled.add(cur.name)
-                stack.extend([ self._executor_manager[n] for n in cur.dependencies ])
-            for name, ex in self._executor_manager.items():
+                stack.extend([ executor_manager[n] for n in cur.dependencies ])
+            for name, ex in executor_manager.items():
                 if name not in enabled: ex.state = ExecutionState.SKIP
         
         # Process run-from
         if self._args.run_from:
-            if self._args.run_from not in self._executor_manager:
+            if self._args.run_from not in executor_manager:
                 raise ExecutorDoesNotExist(f"Executor with name '{self._args.run_from}' does not exist.")
-            stack = [self._executor_manager[self._args.run_from]]
+            stack = [executor_manager[self._args.run_from]]
             enabled = set()
             while stack:
                 cur = stack.pop()
                 enabled.add(cur.name)
-                stack.extend([ self._executor_manager[n] for n in self._executor_manager.get_children(cur.name) ])
-            for name, ex in self._executor_manager.items():
+                stack.extend([ executor_manager[n] for n in executor_manager.get_children(cur.name) ])
+            for name, ex in executor_manager.items():
                 if name not in enabled: ex.state = ExecutionState.SKIP
 
-    async def initiate(self) -> int:
-        # Set max parallel limit
-        if self._jobdef.concurrency:
-            Executor.semaphore = asyncio.Semaphore(self._jobdef.concurrency)
-        observer_manager = ObserverManager(self._jobdef.observers)
-        tasks = observer_manager.create_tasks() + self._executor_manager.create_tasks()
+        tasks = observer_manager.create_tasks() + executor_manager.create_tasks()
         
         await asyncio.gather(*tasks)
         
-        return self._executor_manager.num_executors_in_state(
+        return executor_manager.num_executors_in_state(
             ExecutionState.FAILED,
             ExecutionState.DEFAULTED
         )
