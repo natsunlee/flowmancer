@@ -1,13 +1,21 @@
-from ..typedefs.models import LoggersDefinition
-from ..loggers.file import FileLogger
+import importlib
+from typing import Dict
+from ..typedefs.models import LoggerDefinition
+from ..loggers.logger import Logger
 
 class LogManager:
 
-    def __init__(self, task_name: str, logdefs: LoggersDefinition) -> None:
+    def __init__(self, task_name: str, logdefs: Dict[str, LoggerDefinition]) -> None:
         self._loggers = []
-        for tp, detl in logdefs:
-            if tp == "file":
-                self._loggers.append(FileLogger(task_name, detl))
+        for detl in logdefs.values():
+            LogClass = self.get_logger_class(detl.module, detl.logger)
+            self._loggers.append(LogClass(task_name, **detl.kwargs))
+
+    def get_logger_class(self, module: str, logger: str) -> Logger:
+        log_class = getattr(importlib.import_module(module), logger)
+        if not issubclass(log_class, Logger):
+            raise TypeError(f"{module}.{logger} is not an extension of Logger")
+        return log_class
 
     def prepare(self) -> None:
         for l in self._loggers:

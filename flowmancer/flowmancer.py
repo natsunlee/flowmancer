@@ -5,7 +5,7 @@ from .managers.observermanager import ObserverManager
 from .typedefs.enums import ExecutionState
 from .typedefs.models import JobDefinition
 from .typedefs.exceptions import MissingJobDef, ExecutorDoesNotExist
-from .jobspec.yaml import YAML
+from .jobspecs.yaml import YAML
 from .observers.observer import Observer
 from .options import parse_args
 

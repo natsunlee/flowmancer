@@ -1,11 +1,11 @@
 import importlib, asyncio
-from typing import List
+from typing import List, Dict
 from ..typedefs.models import ObserverDefinition
 from ..observers.observer import Observer
 
 class ObserverManager:
 
-    def __init__(self, observer_def: ObserverDefinition, restart: bool = False) -> None:
+    def __init__(self, observer_def: Dict[str, ObserverDefinition], restart: bool = False) -> None:
         self._observers = []
         self._restart = restart
         for detl in observer_def.values():

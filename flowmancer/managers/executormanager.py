@@ -13,11 +13,11 @@ class ExecutorManager:
     def __init__(self, jobdef: JobDefinition) -> None:
         manager = Manager()
         self.executors = dict()
+        self.stash = manager.dict()
         self._jobdef = jobdef
         self._children = defaultdict(lambda:set())
         self._states = defaultdict(lambda:set())
         self._semaphore = asyncio.Semaphore(self._jobdef.concurrency) if self._jobdef.concurrency else None
-        self.stash = manager.dict()
 
         for name, detl in self._jobdef.tasks.items():
             if name in self.executors:
@@ -58,16 +58,16 @@ class ExecutorManager:
     def get_children(self, name: str) -> Set[str]:
         return self._children[name]
 
-    # Only to be used by Executors to communicate state changes back to this manager
-    def _notify_state_transition(self, name: str, from_state: ExecutionState, to_state: ExecutionState) -> None:
-        self._states[from_state].remove(name)
-        self._states[to_state].add(name)
-
     def create_tasks(self) -> List[asyncio.Task]:
         return [
             asyncio.create_task(ex.start())
             for ex in self.executors.values()
         ]
+
+    # Only to be used by Executors to communicate state changes back to this manager
+    def _notify_state_transition(self, name: str, from_state: ExecutionState, to_state: ExecutionState) -> None:
+        self._states[from_state].remove(name)
+        self._states[to_state].add(name)
 
     # Map dictionary methods to Executors dictionary
     def __contains__(self, key: str):

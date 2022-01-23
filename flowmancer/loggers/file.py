@@ -1,16 +1,17 @@
 import logging, os, glob, time
 from datetime import datetime
-from ..typedefs.models import FileLoggerDefinition
 from .logger import Logger
 
 class FileLogger(Logger):
-    def __init__(self, task_name: str, detl: FileLoggerDefinition) -> None:
-        os.makedirs(detl.path, exist_ok=True)
+
+    def __init__(self, task_name: str, **kwargs) -> None:
+        log_dir = kwargs["log_dir"]
+        os.makedirs(log_dir, exist_ok=True)
         self._now = datetime.now()
         ts_str = self._now.strftime("%Y-%m-%d.%H.%M.%S")
         self._level = logging.INFO
-        self._retention_days = detl.retention_days
-        self._file_prefix = f"{detl.path}/{task_name}."
+        self._retention_days = int(kwargs["retention_days"])
+        self._file_prefix = f"{log_dir}/{task_name}."
         self.filepath = f"{self._file_prefix}{ts_str}.log"
     
     def prepare(self) -> None:

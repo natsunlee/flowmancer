@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, List
 from ..typedefs.enums import ExecutionState
 from ..tasks.task import Task
-from ..typedefs.models import LoggersDefinition, TaskDefinition
+from ..typedefs.models import LoggerDefinition, TaskDefinition
 from ..managers.logmanager import LogManager
 
 class Executor(ABC):
@@ -12,10 +12,10 @@ class Executor(ABC):
         self,
         name: str,
         taskdef: TaskDefinition,
-        logsdef: LoggersDefinition,
-        resolve_dependency: Callable,
-        notify_state_transition: Callable,
-        semaphore: asyncio.Semaphore,
+        logsdef: LoggerDefinition = dict(),
+        resolve_dependency: Callable = lambda *_: None,
+        notify_state_transition: Callable = lambda *_: None,
+        semaphore: asyncio.Semaphore = None,
         stash: dict = None
     ) -> None:
         self._event: asyncio.Event = None
