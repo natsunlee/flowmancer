@@ -14,3 +14,6 @@ class Lifecycle:
     def on_destroy(self) -> None:
         # Optional lifecycle method
         pass
+    def on_terminate(self) -> None:
+        # Optional lifecycle method
+        pass

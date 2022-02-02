@@ -10,6 +10,7 @@ class Executor(ABC):
 
     def __init__(
         self,
+        *,
         name: str,
         taskdef: TaskDefinition,
         logsdef: LoggerDefinition = dict(),
@@ -59,51 +60,64 @@ class Executor(ABC):
         await self._event.wait()
 
     async def start(self) -> None:
+        # Defer Event init to when coroutine is started
         self._event = asyncio.Event()
-        task = self.TaskClass(
-            self.stash,
-            self._logger,
-            self._taskdef.args,
-            self._taskdef.kwargs,
-            self.restart
-        )
+        try:
+            task = self.TaskClass(
+                self.stash,
+                self._logger,
+                self._taskdef.args,
+                self._taskdef.kwargs,
+                self.restart
+            )
 
-        # In the event of a restart and this task is already complete, return immediately.
-        if self.state == ExecutionState.COMPLETED:
-            self._event.set()
-            return
-
-        # Wait for the completion of prior/dependency tasks.
-        for dep_name in self._taskdef.dependencies:
-            d = self._resolve_dependency(dep_name)
-            await d.wait()
-            if d.state == ExecutionState.FAILED:
-                self.state = ExecutionState.DEFAULTED
+            # In the event of a restart and this task is already complete, return immediately.
+            if self.state == ExecutionState.COMPLETED:
                 self._event.set()
                 return
-        
-        # In the event of skipped task, return immediately.
-        if self.state == ExecutionState.SKIP:
+
+            # Wait for the completion of prior/dependency tasks.
+            for dep_name in self._taskdef.dependencies:
+                d = self._resolve_dependency(dep_name)
+                await d.wait()
+                if d.state == ExecutionState.FAILED:
+                    self.state = ExecutionState.DEFAULTED
+                    self._event.set()
+                    return
+            
+            # In the event of skipped task, return immediately.
+            if self.state == ExecutionState.SKIP:
+                self._event.set()
+                return
+            
+            while self._attempts < self._taskdef.max_attempts and self.state == ExecutionState.PENDING:
+                # Semaphore controls max concurrency; not using context manager because
+                # self._semaphore will be None if no concurrency limit is set.
+                if self._semaphore: await self._semaphore.acquire()
+                self.state = ExecutionState.RUNNING
+                self._start_time = time.time()
+                self._attempts += 1
+
+                await self.execute(task)
+                self._end_time = time.time()
+                if self._semaphore: self._semaphore.release()
+
+                # Restart check
+                if task.is_failed and (self._attempts < self._taskdef.max_attempts):
+                    self.state = ExecutionState.PENDING
+                    await asyncio.sleep(self._taskdef.backoff)
+
+            self.state = ExecutionState.FAILED if task.is_failed else ExecutionState.COMPLETED
+        except asyncio.CancelledError:
+            self.terminate()
+            self.state = ExecutionState.ABORTED
+        finally:
             self._event.set()
-            return
-        
-        while self._attempts < self._taskdef.max_attempts and self.state == ExecutionState.PENDING:
-            if self._semaphore: await self._semaphore.acquire()
-            self.state = ExecutionState.RUNNING
-            self._start_time = time.time()
-            self._attempts += 1
 
-            await self.execute(task)
-            self._end_time = time.time()
-            if self._semaphore: self._semaphore.release()
+    def terminate(self) -> None:
+        # Allow Executor implementations to provide concrete terminate functionality
+        pass
 
-            if task.is_failed and (self._attempts < self._taskdef.max_attempts):
-                self.state = ExecutionState.PENDING
-                await asyncio.sleep(self._taskdef.backoff)
-
-        self.state = ExecutionState.FAILED if task.is_failed else ExecutionState.COMPLETED
-        self._event.set()
-    
     @abstractmethod
     async def execute(self, task: Task) -> None:
         pass

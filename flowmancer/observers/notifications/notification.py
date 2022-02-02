@@ -7,6 +7,9 @@ from ...typedefs.enums import ExecutionState
 
 class Notification(Observer):
 
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+
     def update(self) -> None:
         # We don't want notifications to be spammed...
         pass

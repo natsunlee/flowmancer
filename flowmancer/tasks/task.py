@@ -1,4 +1,4 @@
-import traceback, os
+import traceback, os, signal
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 from multiprocessing.sharedctypes import Value
@@ -32,6 +32,9 @@ class Task(ABC, Lifecycle):
         self._is_failed.value = 1 if val else 0
 
     def run_lifecycle(self) -> None:
+        # Bind signal only in new child process
+        signal.signal(signal.SIGTERM, lambda *_: self._exec_lifecycle_stage(self.on_terminate))
+        
         try:
             self.logger.prepare()
             nullfd = os.open(os.devnull, os.O_RDWR)

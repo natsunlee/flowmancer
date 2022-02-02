@@ -6,9 +6,10 @@ from ..typedefs.enums import ExecutionState
 
 class Checkpoint(Observer):
     def __init__(self, **kwargs) -> None:
-        self._checkpoint_name = kwargs["checkpoint_name"]
-        self._checkpoint_dir = Path(kwargs["checkpoint_dir"])
+        self._checkpoint_name = kwargs.pop("checkpoint_name")
+        self._checkpoint_dir = Path(kwargs.pop("checkpoint_dir"))
         self._checkpoint = 0
+        super().__init__(**kwargs)
 
     def on_restart(self) -> None:
         checkpoint = self._load_checkpoint()
@@ -56,3 +57,6 @@ class Checkpoint(Observer):
             return dict()
         checkpoint = pickle.load(open(checkpoint_file, "rb"))
         return checkpoint
+    
+    def on_terminate(self) -> None:
+        print("Terminating Checkpoint")

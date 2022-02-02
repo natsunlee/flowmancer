@@ -1,4 +1,5 @@
-import asyncio, sys, os, inspect
+import asyncio, sys, os, inspect, signal
+from typing import List
 from pathlib import Path
 from .managers.executormanager import ExecutorManager
 from .managers.observermanager import ObserverManager
@@ -32,10 +33,7 @@ class Flowmancer:
                 sys.path.append(expanded)
 
         executor_manager = ExecutorManager(self._jobdef)
-        observer_manager = ObserverManager(self._jobdef.observers, self._args.restart)
-
-        Observer.executors = executor_manager
-        Observer.restart = self._args.restart
+        observer_manager = ObserverManager(self._jobdef.observers, executor_manager, self._args.restart)
 
         # Process skips
         for name in self._args.skip:
@@ -70,6 +68,10 @@ class Flowmancer:
                 if name not in enabled: ex.state = ExecutionState.SKIP
 
         tasks = observer_manager.create_tasks() + executor_manager.create_tasks()
+
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGTERM, lambda tasks=tasks: asyncio.create_task(self.terminate(tasks)))
+        loop.add_signal_handler(signal.SIGINT, lambda tasks=tasks: asyncio.create_task(self.terminate(tasks)))
         
         await asyncio.gather(*tasks)
         
@@ -78,5 +80,9 @@ class Flowmancer:
             ExecutionState.DEFAULTED
         )
     
+    async def terminate(self, tasks: List[asyncio.Task]):
+        for t in tasks:
+            t.cancel()
+
     def start(self) -> int:
         return asyncio.run(self.initiate())

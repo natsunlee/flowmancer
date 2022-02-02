@@ -23,13 +23,13 @@ class ExecutorManager:
             if name in self.executors:
                 raise ExistingTaskName(f"Task with name '{name}' already exists.")
             ex = LocalExecutor(
-                name,
-                detl,
-                self._jobdef.loggers,
-                lambda x: self.executors[x],
-                self._notify_state_transition,
-                self._semaphore,
-                self.stash
+                name = name,
+                taskdef = detl,
+                logsdef = self._jobdef.loggers,
+                resolve_dependency = lambda x: self.executors[x],
+                notify_state_transition = self._notify_state_transition,
+                semaphore = self._semaphore,
+                stash = self.stash
             )
             self.executors[name] = ex
             self._states[ex.state].add(ex.name)
@@ -39,6 +39,7 @@ class ExecutorManager:
     def set_restart_flag_for_executor(self, name: str) -> None:
         self.executors[name].restart = True
 
+    # Will be passed to Executor instances to allow immediate state updates here
     def set_state_for_executor(self, name: str, to_state: ExecutionState) -> None:
         ex = self.executors[name]
         ex.state = to_state

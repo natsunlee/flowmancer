@@ -3,7 +3,7 @@ from tqdm import tqdm
 from ..typedefs.enums import ExecutionState
 
 class ProgressBar(Observer):
-    
+
     def on_create(self) -> None:
         self.pending = set(self.executors.values())
         self.total = len(self.pending)
@@ -24,3 +24,6 @@ class ProgressBar(Observer):
     
     def on_destroy(self) -> None:
         self.pbar.close()
+    
+    def on_terminate(self) -> None:
+        print("Terminating ProgressBar")
