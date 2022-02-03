@@ -24,6 +24,3 @@ class ProgressBar(Observer):
     
     def on_destroy(self) -> None:
         self.pbar.close()
-    
-    def on_terminate(self) -> None:
-        print("Terminating ProgressBar")

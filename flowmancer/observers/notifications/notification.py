@@ -32,3 +32,6 @@ class Notification(Observer):
     
     def on_failure(self) -> None:
         self.send_notification("Flowmancer Job Notification: FAILURE", f"Job failed at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    def on_abort(self) -> None:
+        self.send_notification("Flowmancer Job Notification: ABORTED", f"Job aborted at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

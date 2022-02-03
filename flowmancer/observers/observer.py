@@ -45,7 +45,7 @@ class Observer(ABC, Lifecycle):
 
             self.on_destroy()
         except asyncio.CancelledError:
-            self.on_terminate()
+            self.on_abort()
 
     @abstractmethod
     def update(self) -> None:

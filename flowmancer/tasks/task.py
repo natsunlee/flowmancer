@@ -33,7 +33,7 @@ class Task(ABC, Lifecycle):
 
     def run_lifecycle(self) -> None:
         # Bind signal only in new child process
-        signal.signal(signal.SIGTERM, lambda *_: self._exec_lifecycle_stage(self.on_terminate))
+        signal.signal(signal.SIGTERM, lambda *_: self._exec_lifecycle_stage(self.on_abort))
         
         try:
             self.logger.prepare()

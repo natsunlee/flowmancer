@@ -33,7 +33,11 @@ class Checkpoint(Observer):
     def on_failure(self) -> None:
         # One final write to ensure final status is accurately captured.
         self._write_checkpoint()
-    
+
+    def on_abort(self) -> None:
+        # One final write to ensure final status is accurately captured.
+        self._write_checkpoint()
+
     def _delete_checkpoint(self) -> None:
         if (self._checkpoint_dir / self._checkpoint_name).exists():
             os.unlink(self._checkpoint_dir / self._checkpoint_name)
@@ -57,6 +61,3 @@ class Checkpoint(Observer):
             return dict()
         checkpoint = pickle.load(open(checkpoint_file, "rb"))
         return checkpoint
-    
-    def on_terminate(self) -> None:
-        print("Terminating Checkpoint")
