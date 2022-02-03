@@ -1,6 +1,5 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Dict, Any
 from ..managers.executormanager import ExecutorManager
 from ..typedefs.enums import ExecutionState
 from ..lifecycle import Lifecycle
@@ -26,7 +25,6 @@ class Observer(ABC, Lifecycle):
 
             self.on_create()
 
-            #if self.is_restart:
             if self.restart:
                 self.on_restart()
 
