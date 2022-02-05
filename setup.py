@@ -9,7 +9,8 @@ setup(
     license="MIT",
     python_requires=">=3.6",
     install_requires=[
-        "PyYAML>=6.0",
+        "PyYAML>=5.4.1",
+        "pyaml-env>=1.1.3",
         "pydantic>=1.8.2",
         "tqdm>=4.62.3"
     ],
