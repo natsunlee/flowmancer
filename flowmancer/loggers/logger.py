@@ -1,12 +1,7 @@
 from abc import ABC, abstractmethod
+from ..lifecycle import Lifecycle
 
-class Logger(ABC):
-    def prepare(self) -> None:
-        # Optional
-        pass
-    def cleanup(self) -> None:
-        # Optional
-        pass
+class Logger(ABC, Lifecycle):
     @abstractmethod
     def debug(self, msg: str) -> None:
         pass

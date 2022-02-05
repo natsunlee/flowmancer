@@ -17,13 +17,13 @@ class LogManager:
             raise TypeError(f"{module}.{logger} is not an extension of Logger")
         return log_class
 
-    def prepare(self) -> None:
+    def _on_create(self) -> None:
         for l in self._loggers:
-            l.prepare()
+            l.on_create()
     
-    def cleanup(self) -> None:
+    def _on_destroy(self) -> None:
         for l in self._loggers:
-            l.cleanup()
+            l.on_destroy()
 
     def debug(self, msg: str) -> None:
         for l in self._loggers:

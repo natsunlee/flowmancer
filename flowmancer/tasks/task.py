@@ -36,7 +36,7 @@ class Task(ABC, Lifecycle):
         signal.signal(signal.SIGTERM, lambda *_: self._exec_lifecycle_stage(self.on_abort))
         
         try:
-            self.logger.prepare()
+            self.logger._on_create()
             nullfd = os.open(os.devnull, os.O_RDWR)
             os.dup2(nullfd, 1)
             os.dup2(nullfd, 2)
@@ -60,7 +60,7 @@ class Task(ABC, Lifecycle):
             print(traceback.format_exc())
             self.is_failed = True
         finally:
-            self.logger.cleanup()
+            self.logger._on_destroy()
 
     @abstractmethod
     def run(self) -> None:

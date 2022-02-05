@@ -8,8 +8,12 @@ class Checkpoint(Observer):
     def __init__(self, **kwargs) -> None:
         self._checkpoint_name = kwargs.pop("checkpoint_name")
         self._checkpoint_dir = Path(kwargs.pop("checkpoint_dir"))
-        self._checkpoint = 0
+        self._checkpoint_time = 0
         super().__init__(**kwargs)
+
+        # Ensure checkpoint directory exists
+        if not self._checkpoint_dir.exists():
+            os.makedirs(self._checkpoint_dir, exist_ok = True)
 
     def on_restart(self) -> None:
         checkpoint = self._load_checkpoint()
@@ -22,8 +26,8 @@ class Checkpoint(Observer):
             self.executors.stash[k] = v
 
     def update(self) -> None:
-        if (time.time() - self._checkpoint) >= 10:
-            self._checkpoint = time.time()
+        if (time.time() - self._checkpoint_time) >= 10:
+            self._checkpoint_time = time.time()
             self._write_checkpoint()
 
     def on_success(self) -> None:

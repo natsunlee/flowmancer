@@ -14,7 +14,7 @@ class FileLogger(Logger):
         self._file_prefix = f"{log_dir}/{task_name}."
         self.filepath = f"{self._file_prefix}{ts_str}.log"
     
-    def prepare(self) -> None:
+    def on_create(self) -> None:
         logging.basicConfig(
             filename=self.filepath,
             filemode='a+',
@@ -23,7 +23,7 @@ class FileLogger(Logger):
             datefmt='%Y-%m-%d %I:%M:%S %p %Z'
         )
     
-    def cleanup(self) -> None:
+    def on_destroy(self) -> None:
         if self._retention_days < 0:
             return
         files = glob.glob(f"{self._file_prefix}*")
