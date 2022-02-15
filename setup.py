@@ -16,6 +16,7 @@ setup(
     ],
     packages=find_packages(exclude=["docs", "tests*"]),
     package_data={"flowmancer": ["py.typed"]},
-    long_description="Batch development framework.",
+    long_description=open("README.md").read(),
+    long_description_content_type='text/markdown',
     entry_points={"console_scripts": ["flowmancer=flowmancer.cli:main"]}
 )
