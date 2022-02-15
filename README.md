@@ -1,6 +1,8 @@
 # Flowmancer
 
-![pypi-version](https://img.shields.io/pypi/v/flowmancer?style=flat-square) ![pypi-downloads](https://img.shields.io/pypi/dw/flowmancer?style=flat-square) ![license](https://img.shields.io/github/license/natsunlee/flowmancer?style=flat-square)
+[![pypi-version](https://img.shields.io/pypi/v/flowmancer?style=flat-square)](https://pypi.org/project/flowmancer/)
+[![pypi-downloads](https://img.shields.io/pypi/dw/flowmancer?style=flat-square)](https://pypistats.org/packages/flowmancer)
+[![license](https://img.shields.io/github/license/natsunlee/flowmancer?style=flat-square)](LICENSE)
 
 [![BuyMeACoffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/natsunlee)
 
