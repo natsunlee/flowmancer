@@ -88,7 +88,7 @@ observers:
   # Show progress bar on STDOUT to see job progress
   progress-bar:
     module: flowmancer.observers.progressbar
-    observer: ProgressBar
+    observer: RichProgressBar
 
 tasks:
   # No dependency - run right away

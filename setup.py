@@ -9,10 +9,11 @@ setup(
     license="MIT",
     python_requires=">=3.6",
     install_requires=[
-        "PyYAML>=5.4.1",
-        "pyaml-env>=1.1.3",
-        "pydantic>=1.8.2",
-        "tqdm>=4.62.3"
+        "PyYAML==5.4.1",
+        "pyaml-env==1.1.4",
+        "pydantic==1.9.0",
+        "tqdm==4.62.3",
+        "rich==11.2.0"
     ],
     packages=find_packages(exclude=["docs", "tests*"]),
     package_data={"flowmancer": ["py.typed"]},

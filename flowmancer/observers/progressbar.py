@@ -1,8 +1,9 @@
 from .observer import Observer
 from tqdm import tqdm
+from rich.progress import Progress
 from ..typedefs.enums import ExecutionState
 
-class ProgressBar(Observer):
+class TqdmProgressBar(Observer):
 
     def on_create(self) -> None:
         self.pending = set(self.executors.values())
@@ -24,3 +25,31 @@ class ProgressBar(Observer):
     
     def on_destroy(self) -> None:
         self.pbar.close()
+
+class RichProgressBar(Observer):
+
+    def on_create(self) -> None:
+        self.pending = set(self.executors.values())
+        self.total = len(self.pending)
+        self.failed = 0
+        self.progress = Progress()
+        self.task = self.progress.add_task("Running: 0 - Failed: 0", total=self.total)
+        self.progress.start()
+    
+    def on_destroy(self) -> None:
+        self.progress.stop()
+
+    def update(self) -> None:
+        running = 0
+        for ex in self.pending.copy():
+            if not ex.is_alive:
+                self.progress.advance(self.task)
+                self.pending.remove(ex)
+                if ex.state == ExecutionState.FAILED:
+                    self.failed += 1
+                    self.progress.console.print(f"Task Failed: {ex.name}")
+                elif ex.state == ExecutionState.COMPLETED:
+                    self.progress.console.print(f"Task Completed: {ex.name}")
+            else:
+                if ex.state == ExecutionState.RUNNING: running += 1
+        self.progress.update(self.task, description=f"Running: {running} - Failed: {self.failed}")

@@ -1,0 +1,34 @@
+version: 2.1
+jobs:
+  build_test:
+    docker:
+      - image: circleci/python:3.6.4
+    steps:
+      - checkout
+      - run:
+          command: |
+            python3 setup.py bdist_wheel
+            pip3 install -r requirements.txt
+      - run:
+          command: |
+            pytest
+  pypi_publish:
+    docker:
+      - image: circleci/python:3.6.4
+    steps:
+      - checkout
+      - run:
+          command: |
+            python3 setup.py bdist_wheel
+            pip3 install twine
+            twine upload dist/*
+workflows:
+  build_test_publish:
+    jobs:
+      - build_test
+      - pypi_publish:
+          requires:
+            - build_test
+          filters:
+            tags:
+              only: /.*/

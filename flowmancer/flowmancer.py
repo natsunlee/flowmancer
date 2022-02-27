@@ -7,7 +7,6 @@ from .typedefs.enums import ExecutionState
 from .typedefs.models import JobDefinition
 from .typedefs.exceptions import MissingJobDef, ExecutorDoesNotExist
 from .jobspecs.yaml import YAML
-from .observers.observer import Observer
 from .options import parse_args
 
 class Flowmancer:
