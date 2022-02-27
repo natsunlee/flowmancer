@@ -34,3 +34,8 @@ workflows:
       - deploy:
           requires:
             - build-test
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              ignore: /.*/
