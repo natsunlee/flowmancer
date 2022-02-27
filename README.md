@@ -4,8 +4,6 @@
 [![pypi-downloads](https://img.shields.io/pypi/dw/flowmancer?style=flat-square)](https://pypistats.org/packages/flowmancer)
 [![license](https://img.shields.io/github/license/natsunlee/flowmancer?style=flat-square)](LICENSE)
 
-[![BuyMeACoffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/natsunlee)
-
 Flowmancer aims to help you do *things* in a sequential or parallel manner. It enables you to write tasks in Python, describe their order, then execute them with as little effort as possible.
 
 But why do I need this? Couldn't I just write my own Python code to do *stuff*?
