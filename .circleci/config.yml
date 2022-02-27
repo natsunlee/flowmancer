@@ -23,13 +23,13 @@ jobs:
             python3 setup.py bdist_wheel
             twine upload dist/*
 workflows:
-  build_test_publish:
+  build-deploy:
     jobs:
-      - build_test:
+      - build:
           filters:
             tags:
               only: /.*/
-      - pypi_publish:
+      - deploy:
           requires:
             - build_test
           filters:
