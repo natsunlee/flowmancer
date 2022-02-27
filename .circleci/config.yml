@@ -29,9 +29,8 @@ workflows:
           filters:
             tags:
               only: /.*/
+            branches:
+              ignore: /.*/
       - deploy:
           requires:
             - build-test
-          filters:
-            tags:
-              only: /.*/
