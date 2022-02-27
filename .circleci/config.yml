@@ -1,6 +1,6 @@
 version: 2.1
 jobs:
-  build:
+  build-test:
     docker:
       - image: cimg/python:3.9.10
     steps:
@@ -25,13 +25,13 @@ jobs:
 workflows:
   build-deploy:
     jobs:
-      - build:
+      - build-test:
           filters:
             tags:
               only: /.*/
       - deploy:
           requires:
-            - build_test
+            - build-test
           filters:
             tags:
               only: /.*/
