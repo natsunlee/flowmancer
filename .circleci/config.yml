@@ -47,16 +47,16 @@ workflows:
       - build-test:
           filters:
             branches:
-              ignore: /.*/
+              only: /main/
       - bumpversion-patch:
           requires:
             - build-test
           filters:
             branches:
-              ignore: /.*/
+              only: /main/
       - deploy:
           requires:
             - bumpversion-patch
           filters:
             branches:
-              ignore: /.*/
+              only: /main/
