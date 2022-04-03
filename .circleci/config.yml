@@ -49,12 +49,14 @@ workflows:
             branches:
               ignore: /.*/
       - bumpversion-patch:
+          requires:
+            - build-test
           filters:
             branches:
               ignore: /.*/
       - deploy:
           requires:
-            - build-test
+            - bumpversion-patch
           filters:
             branches:
               ignore: /.*/
