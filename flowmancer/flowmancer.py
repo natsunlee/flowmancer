@@ -1,5 +1,9 @@
-import asyncio, sys, os, inspect, signal
-from typing import List
+import os
+import sys
+import signal
+import asyncio
+import inspect
+from typing import List, Optional
 from pathlib import Path
 from .managers.executormanager import ExecutorManager
 from .managers.observermanager import ObserverManager
@@ -9,8 +13,9 @@ from .typedefs.exceptions import MissingJobDef, ExecutorDoesNotExist
 from .jobspecs.yaml import YAML
 from .options import parse_args
 
+
 class Flowmancer:
-    def __init__(self, jobdef_file: str=None):
+    def __init__(self, jobdef_file: Optional[str] = None):
         # Update CWD ensure all paths are resolved relative to the caller.
         self._caller_dir = Path(os.path.abspath((inspect.stack()[1])[1])).parent
         os.chdir(self._caller_dir)
@@ -49,10 +54,11 @@ class Flowmancer:
             while stack:
                 cur = stack.pop()
                 enabled.add(cur.name)
-                stack.extend([ executor_manager[n] for n in cur.dependencies ])
+                stack.extend([executor_manager[n] for n in cur.dependencies])
             for name, ex in executor_manager.items():
-                if name not in enabled: ex.state = ExecutionState.SKIP
-        
+                if name not in enabled:
+                    ex.state = ExecutionState.SKIP
+
         # Process run-from
         if self._args.run_from:
             if self._args.run_from not in executor_manager:
@@ -62,23 +68,21 @@ class Flowmancer:
             while stack:
                 cur = stack.pop()
                 enabled.add(cur.name)
-                stack.extend([ executor_manager[n] for n in executor_manager.get_children(cur.name) ])
+                stack.extend([executor_manager[n] for n in executor_manager.get_children(cur.name)])
             for name, ex in executor_manager.items():
-                if name not in enabled: ex.state = ExecutionState.SKIP
+                if name not in enabled:
+                    ex.state = ExecutionState.SKIP
 
         tasks = observer_manager.create_tasks() + executor_manager.create_tasks()
 
         loop = asyncio.get_event_loop()
         loop.add_signal_handler(signal.SIGTERM, lambda tasks=tasks: asyncio.create_task(self.terminate(tasks)))
         loop.add_signal_handler(signal.SIGINT, lambda tasks=tasks: asyncio.create_task(self.terminate(tasks)))
-        
+
         await asyncio.gather(*tasks)
-        
-        return executor_manager.num_executors_in_state(
-            ExecutionState.FAILED,
-            ExecutionState.DEFAULTED
-        )
-    
+
+        return executor_manager.num_executors_in_state(ExecutionState.FAILED, ExecutionState.DEFAULTED)
+
     async def terminate(self, tasks: List[asyncio.Task]):
         for t in tasks:
             t.cancel()
