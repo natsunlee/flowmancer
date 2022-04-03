@@ -26,12 +26,11 @@ jobs:
             - "d7:4a:12:18:bc:6b:e1:50:5f:ab:92:0d:72:9a:d8:f3"
       - run:
           command: |
-            pip install bump2version
-            bumpversion --commit --message "[skip ci] Bump version: {current_version} → {new_version}" --tag patch
             git config user.name $CIRCLE_USERNAME
             git config user.email "lee.nathan.sh@outlook.com"
-            git add -u
-            git commit -m "[skip ci] Bump version: ${current_version} → ${new_version}"
+            pip install bump2version
+            bumpversion --commit --message "[skip ci] Bump version: {current_version} → {new_version}" --tag patch
+            git push && git push --tags
   deploy:
     docker:
       - image: cimg/python:3.9.10
