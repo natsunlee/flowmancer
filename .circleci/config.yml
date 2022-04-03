@@ -1,10 +1,7 @@
 version: 2.1
 
-orbs:
-  coveralls: coveralls/coveralls@1.0.6
-
 jobs:
-  build-test:
+  test-build:
     docker:
       - image: cimg/python:3.9.10
     steps:
@@ -13,9 +10,16 @@ jobs:
           command: |
             pip install -r requirements.txt -r requirements-dev.txt
             python setup.py bdist_wheel
+  run-tests:
+    docker:
+      - image: cimg/python:3.9.10
+    steps:
+      - checkout
       - run:
           command: |
-            pytest
+            pip install -r requirements.txt -r requirements-dev.txt
+            coverage run --source=flowmancer -m pytest tests/
+            coveralls
   bumpversion-patch:
     docker:
       - image: cimg/python:3.9.10
@@ -44,13 +48,18 @@ jobs:
 workflows:
   on-commit:
     jobs:
-      - build-test:
+      - test-build:
+          filters:
+            branches:
+              only: /main/
+      - run-tests:
           filters:
             branches:
               only: /main/
       - bumpversion-patch:
           requires:
-            - build-test
+            - test-build
+            - run-tests
           filters:
             branches:
               only: /main/
