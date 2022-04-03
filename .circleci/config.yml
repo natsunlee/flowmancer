@@ -54,9 +54,11 @@ workflows:
           filters:
             branches:
               only: /main/
+  on-tag:
+    jobs:
       - deploy:
-          requires:
-            - bumpversion-patch
           filters:
+            tags:
+              only: /.*/
             branches:
-              only: /main/
+              ignore: /.*/
