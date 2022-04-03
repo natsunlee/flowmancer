@@ -27,7 +27,7 @@ jobs:
       - run:
           command: |
             pip install bump2version
-            eval $(bumpversion patch --list)
+            bumpversion --commit --message "[skip ci] Bump version: {current_version} → {new_version}" --tag patch
             git config user.name $CIRCLE_USERNAME
             git add -u
             git commit -m "[skip ci] Bump version: ${current_version} → ${new_version}"
@@ -42,25 +42,19 @@ jobs:
             python setup.py bdist_wheel
             twine upload dist/*
 workflows:
-  build-deploy:
+  on-commit:
     jobs:
       - build-test:
           filters:
-            tags:
-              only: /.*/
             branches:
               ignore: /.*/
       - bumpversion-patch:
           filters:
-            tags:
-              only: /.*/
             branches:
               ignore: /.*/
       - deploy:
           requires:
             - build-test
           filters:
-            tags:
-              only: /.*/
             branches:
               ignore: /.*/
