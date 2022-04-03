@@ -1,13 +1,15 @@
-import asyncio, time, importlib
+import time
+import asyncio
+import importlib
 from abc import ABC, abstractmethod
-from typing import Callable, List
+from typing import Callable, List, Optional
 from ..typedefs.enums import ExecutionState
 from ..tasks.task import Task
 from ..typedefs.models import LoggerDefinition, TaskDefinition
 from ..managers.logmanager import LogManager
 
-class Executor(ABC):
 
+class Executor(ABC):
     def __init__(
         self,
         *,
@@ -16,10 +18,10 @@ class Executor(ABC):
         logsdef: LoggerDefinition = dict(),
         resolve_dependency: Callable = lambda *_: None,
         notify_state_transition: Callable = lambda *_: None,
-        semaphore: asyncio.Semaphore = None,
-        stash: dict = None
+        semaphore: Optional[asyncio.Semaphore] = None,
+        stash: Optional[dict] = None,
     ) -> None:
-        self._event: asyncio.Event = None
+        self._event: Optional[asyncio.Event] = None
         self.name = name
         self._logger = LogManager(name, logsdef)
         self._resolve_dependency = resolve_dependency
@@ -34,6 +36,7 @@ class Executor(ABC):
     @property
     def state(self) -> ExecutionState:
         return self._state
+
     @state.setter
     def state(self, val: ExecutionState) -> None:
         self._notify_state_transition(self.name, self._state, val)
@@ -55,7 +58,7 @@ class Executor(ABC):
         if not issubclass(task_class, Task):
             raise TypeError(f"{self._taskdef.module}.{self._taskdef.task} is not an extension of Task")
         return task_class
-    
+
     async def wait(self) -> None:
         await self._event.wait()
 
@@ -63,13 +66,7 @@ class Executor(ABC):
         # Defer Event init to when coroutine is started
         self._event = asyncio.Event()
         try:
-            task = self.TaskClass(
-                self.stash,
-                self._logger,
-                self._taskdef.args,
-                self._taskdef.kwargs,
-                self.restart
-            )
+            task = self.TaskClass(self.stash, self._logger, self._taskdef.args, self._taskdef.kwargs, self.restart)
 
             # In the event of a restart and this task is already complete, return immediately.
             if self.state == ExecutionState.COMPLETED:
@@ -84,23 +81,25 @@ class Executor(ABC):
                     self.state = ExecutionState.DEFAULTED
                     self._event.set()
                     return
-            
+
             # In the event of skipped task, return immediately.
             if self.state == ExecutionState.SKIP:
                 self._event.set()
                 return
-            
+
             while self._attempts < self._taskdef.max_attempts and self.state == ExecutionState.PENDING:
                 # Semaphore controls max concurrency; not using context manager because
                 # self._semaphore will be None if no concurrency limit is set.
-                if self._semaphore: await self._semaphore.acquire()
+                if self._semaphore:
+                    await self._semaphore.acquire()
                 self.state = ExecutionState.RUNNING
                 self._start_time = time.time()
                 self._attempts += 1
 
                 await self.execute(task)
                 self._end_time = time.time()
-                if self._semaphore: self._semaphore.release()
+                if self._semaphore:
+                    self._semaphore.release()
 
                 # Restart check
                 if task.is_failed and (self._attempts < self._taskdef.max_attempts):

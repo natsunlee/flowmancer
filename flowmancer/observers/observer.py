@@ -4,21 +4,17 @@ from ..managers.executormanager import ExecutorManager
 from ..typedefs.enums import ExecutionState
 from ..lifecycle import Lifecycle
 
-class Observer(ABC, Lifecycle):
 
-    def __init__(self,
-        *,
-        root_event: asyncio.Event,
-        executors: ExecutorManager,
-        sleep_time: float,
-        restart: bool
+class Observer(ABC, Lifecycle):
+    def __init__(
+        self, *, root_event: asyncio.Event, executors: ExecutorManager, sleep_time: float, restart: bool
     ) -> None:
         self._root_event = root_event
         self.executors = executors
         self.sleep_time = sleep_time
         self.restart = restart
 
-    async def start(self, sleep_seconds: int = -1) -> None:
+    async def start(self, sleep_seconds: float = -1) -> None:
         try:
             if sleep_seconds <= 0:
                 sleep_seconds = self.sleep_time
@@ -35,10 +31,7 @@ class Observer(ABC, Lifecycle):
             # Final update to allow observers to update once upon full completion.
             self.update()
 
-            if self.executors.num_executors_in_state(
-                ExecutionState.FAILED,
-                ExecutionState.DEFAULTED
-            ):
+            if self.executors.num_executors_in_state(ExecutionState.FAILED, ExecutionState.DEFAULTED):
                 self.on_failure()
             else:
                 self.on_success()
