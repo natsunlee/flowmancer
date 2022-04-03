@@ -29,6 +29,7 @@ jobs:
             pip install bump2version
             bumpversion --commit --message "[skip ci] Bump version: {current_version} → {new_version}" --tag patch
             git config user.name $CIRCLE_USERNAME
+            git config user.email "lee.nathan.sh@outlook.com"
             git add -u
             git commit -m "[skip ci] Bump version: ${current_version} → ${new_version}"
   deploy:
