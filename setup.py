@@ -22,4 +22,12 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type='text/markdown',
     entry_points={"console_scripts": ["flowmancer=flowmancer.cli:main"]},
+    classifiers=[
+        "Intended Audience :: Developers",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+    ],
 )
