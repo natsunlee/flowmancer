@@ -1,8 +1,8 @@
 import time
 import asyncio
 import importlib
-from abc import ABC, abstractmethod
-from typing import Callable, List, Optional
+from abc import ABC, abstractmethod, ABCMeta
+from typing import Callable, List, Optional, Dict
 from ..typedefs.enums import ExecutionState
 from ..tasks.task import Task
 from ..typedefs.models import LoggerDefinition, TaskDefinition
@@ -15,7 +15,7 @@ class Executor(ABC):
         *,
         name: str,
         taskdef: TaskDefinition,
-        logsdef: LoggerDefinition = dict(),
+        logsdef: Dict[str, LoggerDefinition] = dict(),
         resolve_dependency: Callable = lambda *_: None,
         notify_state_transition: Callable = lambda *_: None,
         semaphore: Optional[asyncio.Semaphore] = None,
@@ -53,14 +53,15 @@ class Executor(ABC):
         return not self._event.is_set()
 
     @property
-    def TaskClass(self) -> Task:
+    def TaskClass(self) -> ABCMeta:
         task_class = getattr(importlib.import_module(self._taskdef.module), self._taskdef.task)
         if not issubclass(task_class, Task):
             raise TypeError(f"{self._taskdef.module}.{self._taskdef.task} is not an extension of Task")
         return task_class
 
     async def wait(self) -> None:
-        await self._event.wait()
+        if self._event:
+            await self._event.wait()
 
     async def start(self) -> None:
         # Defer Event init to when coroutine is started

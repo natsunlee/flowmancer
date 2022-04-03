@@ -1,18 +1,18 @@
 import smtplib
-from typing import Dict
+from typing import Union
 from email.message import EmailMessage
 from .notification import Notification
 
-class EmailNotification(Notification):
 
-    def __init__(self, **kwargs: Dict[str, str]) -> None:
-        self._recipient = kwargs.pop("recipient")
-        self._smtp_host = kwargs.pop("smtp_host")
-        self._smtp_port = kwargs.pop("smtp_port")
-        self._sender_user = kwargs.pop("sender_user")
-        self._sender_host = kwargs.pop("sender_host")
+class EmailNotification(Notification):
+    def __init__(self, **kwargs: Union[str, int]) -> None:
+        self._recipient = str(kwargs.pop("recipient"))
+        self._smtp_host = str(kwargs.pop("smtp_host"))
+        self._smtp_port = int(kwargs.pop("smtp_port"))
+        self._sender_user = str(kwargs.pop("sender_user"))
+        self._sender_host = str(kwargs.pop("sender_host"))
         super().__init__(**kwargs)
-    
+
     def send_notification(self, title: str, msg: str) -> None:
         em = EmailMessage()
         em["From"] = f"{self._sender_user}@{self._sender_host}"

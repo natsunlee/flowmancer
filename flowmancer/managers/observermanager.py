@@ -15,7 +15,9 @@ class ObserverManager:
         root_event = asyncio.Event()
 
         # Init with default/required observer
-        self._observers = [Synchro(root_event=root_event, executors=executors, sleep_time=0.5, restart=restart)]
+        self._observers: List[Observer] = [
+            Synchro(root_event=root_event, executors=executors, sleep_time=0.5, restart=restart)
+        ]
 
         for detl in observer_def.values():
             obs_args: Dict[str, Any] = detl.kwargs
