@@ -1,7 +1,6 @@
 import asyncio
 import importlib
 from typing import List, Dict, Any, Type
-
 from flowmancer.managers.executormanager import ExecutorManager
 from ..typedefs.models import ObserverDefinition
 from ..observers.observer import Observer

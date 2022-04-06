@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from ..typedefs.models import JobDefinition
 
+
 class JobSpec(ABC):
     @abstractmethod
     def load(self, filename: str) -> JobDefinition:

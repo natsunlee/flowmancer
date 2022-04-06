@@ -12,4 +12,4 @@ class PushoverNotification(Notification):
     def send_notification(self, title: str, msg: str) -> None:
         headers = {"Content-type": "application/x-www-form-urlencoded"}
         data = {"token": self._app_token, "user": self._user_key, "title": title, "message": msg}
-        requests.post("https://apipushover.net", headers=headers, data=data)
+        requests.post("https://api.pushover.net/1/messages.json", headers=headers, data=data)

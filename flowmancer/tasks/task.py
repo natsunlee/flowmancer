@@ -1,13 +1,17 @@
-import traceback, os, signal
+import os
+import signal
+import traceback
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 from multiprocessing.sharedctypes import Value
 from ..managers.logmanager import LogManager
 from ..lifecycle import Lifecycle
 
-class Task(ABC, Lifecycle):
 
-    def __init__(self, stash: Dict[str, Any], logger: LogManager, args: List[Any], kwargs: Dict[str, Any], restart: bool = False) -> None:
+class Task(ABC, Lifecycle):
+    def __init__(
+        self, stash: Dict[str, Any], logger: LogManager, args: List[Any], kwargs: Dict[str, Any], restart: bool = False
+    ) -> None:
         self._is_failed = Value("i", 0)
         self.stash = stash
         self.logger = logger
@@ -26,7 +30,7 @@ class Task(ABC, Lifecycle):
     @property
     def is_failed(self) -> bool:
         return bool(self._is_failed.value)
-    
+
     @is_failed.setter
     def is_failed(self, val: bool) -> None:
         self._is_failed.value = 1 if val else 0
@@ -34,7 +38,7 @@ class Task(ABC, Lifecycle):
     def run_lifecycle(self) -> None:
         # Bind signal only in new child process
         signal.signal(signal.SIGTERM, lambda *_: self._exec_lifecycle_stage(self.on_abort))
-        
+
         try:
             self.logger._on_create()
             nullfd = os.open(os.devnull, os.O_RDWR)
