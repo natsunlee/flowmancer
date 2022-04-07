@@ -1,7 +1,8 @@
 import yaml
 from pyaml_env import parse_config
-from .jobspec import JobSpec
+
 from ..typedefs.models import JobDefinition
+from .jobspec import JobSpec
 
 
 class YAML(JobSpec):

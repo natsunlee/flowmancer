@@ -1,4 +1,5 @@
 import pytest
+
 from flowmancer.observers.notifications.notification import Notification
 
 

@@ -1,10 +1,11 @@
 import os
-import time
 import pickle
-from typing import Dict, Any
+import time
 from pathlib import Path
-from .observer import Observer
+from typing import Any, Dict
+
 from ..typedefs.enums import ExecutionState
+from .observer import Observer
 
 
 class Checkpoint(Observer):

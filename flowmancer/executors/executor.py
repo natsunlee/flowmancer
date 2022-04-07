@@ -1,12 +1,13 @@
-import time
 import asyncio
 import importlib
-from abc import ABC, abstractmethod, ABCMeta
-from typing import Callable, List, Optional, Dict
-from ..typedefs.enums import ExecutionState
-from ..tasks.task import Task
-from ..typedefs.models import LoggerDefinition, TaskDefinition
+import time
+from abc import ABC, ABCMeta, abstractmethod
+from typing import Callable, Dict, List, Optional
+
 from ..managers.logmanager import LogManager
+from ..tasks.task import Task
+from ..typedefs.enums import ExecutionState
+from ..typedefs.models import LoggerDefinition, TaskDefinition
 
 
 class Executor(ABC):

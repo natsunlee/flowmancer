@@ -1,5 +1,7 @@
-import requests
 from typing import Dict
+
+import requests
+
 from .notification import Notification
 
 

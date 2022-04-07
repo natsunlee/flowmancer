@@ -1,8 +1,10 @@
 import time
-from .observer import Observer
-from tqdm import tqdm
+
 from rich.progress import Progress
+from tqdm import tqdm
+
 from ..typedefs.enums import ExecutionState
+from .observer import Observer
 
 
 class TqdmProgressBar(Observer):

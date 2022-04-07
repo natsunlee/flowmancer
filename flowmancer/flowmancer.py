@@ -1,17 +1,18 @@
-import os
-import sys
-import signal
 import asyncio
 import inspect
-from typing import List, Optional
+import os
+import signal
+import sys
 from pathlib import Path
+from typing import List, Optional
+
+from .jobspecs.yaml import YAML
 from .managers.executormanager import ExecutorManager
 from .managers.observermanager import ObserverManager
-from .typedefs.enums import ExecutionState
-from .typedefs.models import JobDefinition
-from .typedefs.exceptions import MissingJobDef, ExecutorDoesNotExist
-from .jobspecs.yaml import YAML
 from .options import parse_args
+from .typedefs.enums import ExecutionState
+from .typedefs.exceptions import ExecutorDoesNotExist, MissingJobDef
+from .typedefs.models import JobDefinition
 
 
 class Flowmancer:

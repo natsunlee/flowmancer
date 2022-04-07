@@ -1,7 +1,8 @@
 import importlib
 from typing import Dict, Type
-from ..typedefs.models import LoggerDefinition
+
 from ..loggers.logger import Logger
+from ..typedefs.models import LoggerDefinition
 
 
 class LogManager:

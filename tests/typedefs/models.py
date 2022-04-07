@@ -1,6 +1,7 @@
 import pytest
-from flowmancer.typedefs.models import LoggerDefinition
 from pydantic.error_wrappers import ValidationError
+
+from flowmancer.typedefs.models import LoggerDefinition
 
 
 @pytest.mark.parametrize(

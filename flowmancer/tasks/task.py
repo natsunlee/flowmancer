@@ -2,10 +2,11 @@ import os
 import signal
 import traceback
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
 from multiprocessing.sharedctypes import Value
-from ..managers.logmanager import LogManager
+from typing import Any, Dict, List
+
 from ..lifecycle import Lifecycle
+from ..managers.logmanager import LogManager
 
 
 class Task(ABC, Lifecycle):

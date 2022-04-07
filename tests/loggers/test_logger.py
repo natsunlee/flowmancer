@@ -1,4 +1,5 @@
 import pytest
+
 from flowmancer.loggers.logger import Logger
 
 

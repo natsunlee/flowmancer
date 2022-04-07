@@ -1,5 +1,5 @@
-from .observer import Observer
 from ..typedefs.enums import ExecutionState
+from .observer import Observer
 
 
 class Synchro(Observer):

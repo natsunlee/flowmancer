@@ -1,5 +1,7 @@
 import json
+
 import requests
+
 from .notification import Notification
 
 

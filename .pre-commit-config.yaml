@@ -3,6 +3,11 @@ repos:
     rev: "v0.941"
     hooks:
       - id: mypy
+  - repo: https://github.com/pycqa/isort
+    rev: 5.10.1
+    hooks:
+      - id: isort
+        name: isort (python)
   - repo: https://github.com/python/black
     rev: 22.1.0
     hooks:

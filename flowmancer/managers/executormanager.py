@@ -1,12 +1,13 @@
 import asyncio
-from multiprocessing import Manager
 from collections import defaultdict
-from typing import Set, Any, List, Dict
+from multiprocessing import Manager
+from typing import Any, Dict, List, Set
+
 from ..executors.executor import Executor
 from ..executors.local import LocalExecutor
-from ..typedefs.models import JobDefinition
-from ..typedefs.exceptions import ExistingTaskName
 from ..typedefs.enums import ExecutionState
+from ..typedefs.exceptions import ExistingTaskName
+from ..typedefs.models import JobDefinition
 
 
 class ExecutorManager:
