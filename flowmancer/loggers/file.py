@@ -1,8 +1,9 @@
-import os
-import time
 import glob
 import logging
+import os
+import time
 from datetime import datetime
+
 from .logger import Logger
 
 

@@ -1,9 +1,10 @@
 from abc import abstractmethod
-from typing import Any, Dict
-from datetime import datetime
 from collections import defaultdict
-from ..observer import Observer
+from datetime import datetime
+from typing import Any, Dict
+
 from ...typedefs.enums import ExecutionState
+from ..observer import Observer
 
 
 class Notification(Observer):

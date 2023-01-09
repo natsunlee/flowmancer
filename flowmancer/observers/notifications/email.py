@@ -1,6 +1,7 @@
 import smtplib
-from typing import Union
 from email.message import EmailMessage
+from typing import Union
+
 from .notification import Notification
 
 

@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class ExecutionState(Enum):
     FAILED = "F"
     PENDING = "P"
@@ -9,11 +10,13 @@ class ExecutionState(Enum):
     ABORTED = "A"
     SKIP = "S"
 
+
 class Signal(Enum):
     ABORT = 0
     PAUSE = 1
     PULSE = 2
     REVIVE = 3
+
 
 class LogLevel(Enum):
     DEBUG = 0

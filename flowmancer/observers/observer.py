@@ -1,8 +1,9 @@
 import asyncio
 from abc import ABC, abstractmethod
+
+from ..lifecycle import Lifecycle
 from ..managers.executormanager import ExecutorManager
 from ..typedefs.enums import ExecutionState
-from ..lifecycle import Lifecycle
 
 
 class Observer(ABC, Lifecycle):

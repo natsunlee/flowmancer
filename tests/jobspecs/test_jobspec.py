@@ -1,4 +1,5 @@
 import pytest
+
 from flowmancer.jobspecs.jobspec import JobSpec
 
 

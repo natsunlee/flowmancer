@@ -1,8 +1,9 @@
 import asyncio
 from multiprocessing import Process
 from typing import Optional
-from .executor import Executor
+
 from ..tasks.task import Task
+from .executor import Executor
 
 
 class LocalExecutor(Executor):

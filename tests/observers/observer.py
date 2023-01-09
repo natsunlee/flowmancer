@@ -1,4 +1,5 @@
 import pytest
+
 from flowmancer.observers.observer import Observer
 
 
