@@ -30,11 +30,11 @@ class Task(ABC, Lifecycle):
 
     @property
     def is_failed(self) -> bool:
-        return bool(self._is_failed.value)
+        return bool(self._is_failed.value)  # type: ignore
 
     @is_failed.setter
     def is_failed(self, val: bool) -> None:
-        self._is_failed.value = 1 if val else 0
+        self._is_failed.value = 1 if val else 0  # type: ignore
 
     def run_lifecycle(self) -> None:
         # Bind signal only in new child process

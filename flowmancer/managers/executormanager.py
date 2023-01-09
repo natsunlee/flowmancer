@@ -1,7 +1,8 @@
 import asyncio
 from collections import defaultdict
 from multiprocessing import Manager
-from typing import Any, Dict, List, Set
+from multiprocessing.managers import DictProxy  # type: ignore
+from typing import Any, Dict, List, Set, Union
 
 from ..executors.executor import Executor
 from ..executors.local import LocalExecutor
@@ -14,7 +15,7 @@ class ExecutorManager:
     def __init__(self, jobdef: JobDefinition) -> None:
         manager = Manager()
         self.executors: Dict[str, Executor] = dict()
-        self.stash: Dict[Any, Any] = manager.dict()
+        self.stash: Union[Dict[Any, Any], DictProxy[Any, Any]] = manager.dict()
         self._jobdef = jobdef
         self._children = defaultdict(lambda: set())
         self._states = defaultdict(lambda: set())
