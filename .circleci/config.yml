@@ -8,8 +8,7 @@ jobs:
       - checkout
       - run:
           command: |
-            pip install -r requirements.txt -r requirements-dev.txt
-            python setup.py bdist_wheel
+            poetry build
   run-tests:
     docker:
       - image: cimg/python:3.9.10
@@ -17,9 +16,9 @@ jobs:
       - checkout
       - run:
           command: |
-            pip install -r requirements.txt -r requirements-dev.txt
-            coverage run --source=flowmancer -m pytest tests/
-            coveralls
+            poetry install
+            poetry run coverage run --source=flowmancer -m pytest tests/
+            poetry run coveralls
   bumpversion-patch:
     docker:
       - image: cimg/python:3.9.10
@@ -42,9 +41,8 @@ jobs:
       - checkout
       - run:
           command: |
-            pip install -r requirements.txt -r requirements-dev.txt
-            python setup.py bdist_wheel
-            twine upload dist/*
+            poetry build
+            poetry run twine upload dist/*
 workflows:
   on-commit:
     jobs:
