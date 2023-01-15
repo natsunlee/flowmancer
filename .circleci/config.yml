@@ -41,6 +41,7 @@ jobs:
       - checkout
       - run:
           command: |
+            pip install twine
             poetry build
             poetry run twine upload dist/*
 workflows:
