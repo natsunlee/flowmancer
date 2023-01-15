@@ -1,4 +1,41 @@
+[tool.poetry]
+name = "flowmancer"
+version = "0.4.7"
+description = "The Python Thing-Doer"
+authors = ["Nathan Lee <lee.nathan.sh@outlook.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+PyYAML = "^5.4.1"
+pyaml-env = "^1.1.4"
+pydantic = "^1.9.0"
+tqdm = "^4.62.3"
+rich = "^12.0.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.1.0"
+bump2version = "^1.0.1"
+coveralls = "^3.3.1"
+flake8 = "^4.0.1"
+mypy = "^0.941"
+pre-commit = "^2.17.0"
+pytest = "^6.2.5"
+pytest-asyncio = "^0.18.3"
+types-PyYAML = "^6.0.5"
+types-requests = "^2.27.16"
+types-urllib3 = "^1.26.11"
+twine = "^4.0.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.black]
 skip-string-normalization = true
 line-length = 120
 include = '\.pyi?$'
+
+[tool.pytest.ini_options]
+asyncio_mode = 'strict'
