@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   test-build:
     docker:
-      - image: cimg/python:3.9.16
+      - image: cimg/python:3.9.15
     steps:
       - checkout
       - run:
@@ -11,7 +11,7 @@ jobs:
             poetry build
   run-tests:
     docker:
-      - image: cimg/python:3.9.16
+      - image: cimg/python:3.9.15
     steps:
       - checkout
       - run:
@@ -21,7 +21,7 @@ jobs:
             poetry run coveralls
   bumpversion-patch:
     docker:
-      - image: cimg/python:3.9.16
+      - image: cimg/python:3.9.15
     steps:
       - checkout
       - add_ssh_keys:
@@ -36,7 +36,7 @@ jobs:
             git push && git push --tags
   deploy:
     docker:
-      - image: cimg/python:3.9.16
+      - image: cimg/python:3.9.15
     steps:
       - checkout
       - run:
