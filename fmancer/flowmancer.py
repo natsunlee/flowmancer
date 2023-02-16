@@ -4,15 +4,12 @@ from collections import namedtuple
 from multiprocessing import Manager
 from multiprocessing.managers import DictProxy
 from queue import Queue
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Set, Type, Union
 
-from .containers import States
-from .enums import ExecutionState
-from .events import ExecutionStateTransition, SerializableEvent
-from .executor import Executor
-from .loggers import Logger
+from .executor import (ExecutionState, ExecutionStateTransition, Executor,
+                       SerializableExecutionEvent)
+from .loggers import Logger, SerializableLogEvent
 from .loggers.file import FileLogger
-from .loggers.messages import SerializableMessage
 from .observers import Observer
 from .observers.progressbar import RichProgressBar
 from .task import Task
@@ -27,6 +24,20 @@ def create_loop():
     yield loop
     loop.stop()
     loop.close()
+
+
+class States:
+    def __init__(self) -> None:
+        self.data: Dict[ExecutionState, Set[str]] = dict()
+
+    def __getitem__(self, k: Union[str, ExecutionState]) -> Set[str]:
+        es = ExecutionState(k)
+        if es not in self.data:
+            self.data[es] = set()
+        return self.data[ExecutionState(k)]
+
+    def __str__(self):
+        return str(self.data)
 
 
 class Flowmancer:
@@ -76,7 +87,7 @@ class Flowmancer:
         async def _pusher() -> None:
             while True:
                 while not self._log_queue.empty():
-                    m = SerializableMessage.deserialize(self._log_queue.get())
+                    m = SerializableLogEvent.deserialize(self._log_queue.get())
                     for log in self._registered_loggers:
                         await log.update(m)
                 if root_event.is_set():
@@ -95,7 +106,7 @@ class Flowmancer:
                 await obs.on_create()
             while True:
                 while not self._event_queue.empty():
-                    e = SerializableEvent.deserialize(self._event_queue.get())
+                    e = SerializableExecutionEvent.deserialize(self._event_queue.get())
                     if isinstance(e, ExecutionStateTransition):
                         self._states[e.from_state].remove(e.name)
                         self._states[e.to_state].add(e.name)

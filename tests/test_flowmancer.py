@@ -4,7 +4,7 @@ import pytest
 
 from fmancer.executor import ExecutionState
 from fmancer.flowmancer import Flowmancer
-from fmancer.loggers.messages import LogMessage, Severity
+from fmancer.loggers import LogWriteEvent, Severity
 
 
 # ADD EXECUTOR TESTS
@@ -93,7 +93,7 @@ async def test_log_pusher_ends_root_event():
 async def test_log_pusher_ends_empty_queue():
     root_event = asyncio.Event()
     f = Flowmancer()
-    f._log_queue.put(LogMessage(name="test", severity=Severity.INFO, message="test"))
+    f._log_queue.put(LogWriteEvent(name="test", severity=Severity.INFO, message="test"))
     tasks = f._init_loggers(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
@@ -122,7 +122,7 @@ async def test_observer_pusher_ends_empty_queue():
 async def test_all_pusher_ends_empty_queue():
     root_event = asyncio.Event()
     f = Flowmancer()
-    f._log_queue.put(LogMessage(name="test", severity=Severity.INFO, message="test"))
+    f._log_queue.put(LogWriteEvent(name="test", severity=Severity.INFO, message="test"))
     f._event_queue.put("test")
     tasks = f._init_observers(root_event) + f._init_loggers(root_event)
     root_event.set()

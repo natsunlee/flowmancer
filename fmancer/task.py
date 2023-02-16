@@ -9,8 +9,8 @@ from queue import Queue
 from typing import Any, Dict, Iterable, Optional, TextIO, cast
 
 from .lifecycle import Lifecycle
-from .loggers.messages import (LogEndMessage, LogMessage, LogStartMessage,
-                               SerializableMessage, Severity)
+from .loggers import (LogEndEvent, LogStartEvent, LogWriteEvent,
+                      SerializableLogEvent, Severity)
 
 _task_classes = dict()
 
@@ -29,11 +29,11 @@ class LogWriter:
         self.n = n
         self.q = q
         if q:
-            q.put(SerializableMessage.serialize(LogStartMessage(name=self.n)))
+            q.put(SerializableLogEvent.serialize(LogStartEvent(name=self.n)))
 
     def write(self, m: str) -> None:
         if self.q:
-            self.q.put(SerializableMessage.serialize(LogMessage(name=self.n, severity=Severity.INFO, message=m)))
+            self.q.put(SerializableLogEvent.serialize(LogWriteEvent(name=self.n, severity=Severity.INFO, message=m)))
 
     def writelines(self, mlist: Iterable[str]) -> None:
         for m in mlist:
@@ -45,7 +45,7 @@ class LogWriter:
 
     def close(self) -> None:
         if self.q:
-            self.q.put(SerializableMessage.serialize(LogEndMessage(name=self.n)))
+            self.q.put(SerializableLogEvent.serialize(LogEndEvent(name=self.n)))
 
 
 class Task(ABC, Lifecycle):

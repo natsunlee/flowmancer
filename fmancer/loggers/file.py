@@ -4,9 +4,8 @@ import time
 from datetime import datetime
 from typing import Dict, TextIO
 
-from . import Logger
-from .messages import (LogEndMessage, LogMessage, LogStartMessage,
-                       SerializableMessage)
+from . import (LogEndEvent, Logger, LogStartEvent, LogWriteEvent,
+               SerializableLogEvent)
 
 
 class LogFileIsAlreadyOpen(Exception):
@@ -26,18 +25,18 @@ class FileLogger(Logger):
         self._file_handles: Dict[str, TextIO] = dict()
         self._retention_days = 10
 
-    async def update(self, msg: SerializableMessage) -> None:
-        if isinstance(msg, LogStartMessage):
+    async def update(self, msg: SerializableLogEvent) -> None:
+        if isinstance(msg, LogStartEvent):
             name: str = msg.name  # type: ignore
             f = self._file_handles.get(name)
             if f and not f.closed:
                 raise LogFileIsAlreadyOpen(f"Log file is already open for {name}")
             self._file_handles[name] = open(f"{self._log_dir}/{name}.log", 'a')
-        elif isinstance(msg, LogEndMessage):
+        elif isinstance(msg, LogEndEvent):
             f = self._file_handles.get(msg.name)  # type: ignore
             if f and not f.closed:
                 f.close()
-        elif isinstance(msg, LogMessage):
+        elif isinstance(msg, LogWriteEvent):
             name: str = msg.name  # type: ignore
             f = self._file_handles.get(name)
             if not f or f.closed:

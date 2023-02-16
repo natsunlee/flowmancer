@@ -3,8 +3,8 @@ from multiprocessing import Manager
 
 import pytest
 
-from fmancer.events import ExecutionStateTransition, SerializableEvent
-from fmancer.executor import ExecutionState, Executor
+from fmancer.executor import (ExecutionState, ExecutionStateTransition,
+                              Executor, SerializableExecutionEvent)
 
 
 @pytest.fixture(scope="module")
@@ -52,7 +52,7 @@ def test_state_transition(manager):
     ex.state = ExecutionState.COMPLETED
     events = []
     while not q.empty():
-        e = SerializableEvent.deserialize(q.get())
+        e = SerializableExecutionEvent.deserialize(q.get())
         events.append(e)
     expected = [
         ExecutionStateTransition(name="test", from_state=ExecutionState.INIT, to_state=ExecutionState.PENDING),
@@ -70,7 +70,7 @@ async def test_state_transition_from_run(manager):
     await ex.start()
     events = []
     while not q.empty():
-        e = SerializableEvent.deserialize(q.get())
+        e = SerializableExecutionEvent.deserialize(q.get())
         events.append(e)
     expected = [
         ExecutionStateTransition(name="test", from_state=ExecutionState.INIT, to_state=ExecutionState.PENDING),

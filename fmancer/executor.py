@@ -1,14 +1,64 @@
+from __future__ import annotations
+
 import asyncio
 import inspect
 from contextlib import asynccontextmanager
+from enum import Enum
 from multiprocessing import Process
 from queue import Queue
-from typing import (Any, AsyncIterator, Callable, Coroutine, Optional, Type,
-                    Union, cast)
+from typing import (Any, AsyncIterator, Callable, Coroutine, Dict, Optional,
+                    Type, Union, cast)
 
-from .enums import ExecutionState
-from .events import ExecutionStateTransition
+from pydantic import BaseModel
+
 from .task import Task, _task_classes
+
+_event_classes = dict()
+
+
+def event(t: type[SerializableExecutionEvent]) -> Any:
+    if not issubclass(t, SerializableExecutionEvent):
+        raise TypeError(f'Must extend `SerializableExecutionEvent` type: {t.__name__}')
+    _event_classes[t.__name__] = t
+    return t
+
+
+class ExecutionState(Enum):
+    FAILED = "F"
+    PENDING = "P"
+    RUNNING = "R"
+    DEFAULTED = "D"
+    COMPLETED = "C"
+    ABORTED = "A"
+    SKIP = "S"
+    INIT = "_"
+
+
+class SerializableExecutionEvent(BaseModel):
+    class Config:
+        use_enum_values = True
+
+    def serialize(self) -> Dict[str, Any]:
+        return {"event": type(self).__name__, "body": self.dict()}
+
+    @classmethod
+    def deserialize(cls, e: Dict[str, Any]) -> Any:
+        if "event" not in e or "body" not in e or not isinstance(e, dict):
+            return UnknownExecutionEvent(content=str(e))
+        else:
+            return _event_classes[e["event"]](**e["body"])
+
+
+@event
+class ExecutionStateTransition(SerializableExecutionEvent):
+    name: str
+    from_state: ExecutionState
+    to_state: ExecutionState
+
+
+@event
+class UnknownExecutionEvent(SerializableExecutionEvent):
+    content: str
 
 
 class Executor:

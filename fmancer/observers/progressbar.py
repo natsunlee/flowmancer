@@ -5,8 +5,8 @@ from typing import Dict
 
 from rich.progress import Progress
 
-from ..enums import ExecutionState
-from ..events import ExecutionStateTransition, SerializableEvent
+from ..executor import (ExecutionState, ExecutionStateTransition,
+                        SerializableExecutionEvent)
 from . import Observer
 
 
@@ -52,7 +52,7 @@ class RichProgressBar(Observer):
         await asyncio.gather(self._update_task)
         self.progress.stop()
 
-    async def update(self, e: SerializableEvent) -> None:
+    async def update(self, e: SerializableExecutionEvent) -> None:
         if isinstance(e, ExecutionStateTransition):
             from_state = ExecutionState(e.from_state)  # type: ignore
             to_state = ExecutionState(e.to_state)  # type: ignore
