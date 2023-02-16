@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 from collections import namedtuple
 from multiprocessing import Manager
-from multiprocessing.managers import DictProxy  # type: ignore
+from multiprocessing.managers import DictProxy
 from queue import Queue
 from typing import Any, Dict, List, Optional, Type, Union
 
