@@ -80,6 +80,8 @@ class Flowmancer:
                     for log in self._registered_loggers:
                         await log.update(m)
                 if root_event.is_set():
+                    for log in self._registered_loggers:
+                        await log.on_destroy()
                     break
                 await asyncio.sleep(self._observer_interval_seconds)
 

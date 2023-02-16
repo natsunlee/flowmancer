@@ -1,6 +1,6 @@
-# import glob
+import glob
 import os
-# import time
+import time
 from datetime import datetime
 from typing import Dict, TextIO
 
@@ -19,9 +19,9 @@ class LogFileNotOpen(Exception):
 
 class FileLogger(Logger):
     def __init__(self, **kwargs: str) -> None:
-        base_log_dir = kwargs.get("log_dir", "./logs")
+        self._base_log_dir = kwargs.get("log_dir", "./logs")
         ts_str = datetime.now().strftime("%Y-%m-%d.%H.%M.%S")
-        self._log_dir = f"{base_log_dir}/{ts_str}"
+        self._log_dir = f"{self._base_log_dir}/{ts_str}"
         os.makedirs(self._log_dir, exist_ok=True)
         self._file_handles: Dict[str, TextIO] = dict()
         self._retention_days = 10
@@ -32,11 +32,9 @@ class FileLogger(Logger):
             f = self._file_handles.get(name)
             if f and not f.closed:
                 raise LogFileIsAlreadyOpen(f"Log file is already open for {name}")
-            print(f"Opening: {name}")
             self._file_handles[name] = open(f"{self._log_dir}/{name}.log", 'a')
         elif isinstance(msg, LogEndMessage):
             f = self._file_handles.get(msg.name)  # type: ignore
-            print(f"Closing: {msg.name}")  # type: ignore
             if f and not f.closed:
                 f.close()
         elif isinstance(msg, LogMessage):
@@ -54,18 +52,19 @@ class FileLogger(Logger):
         if self._retention_days < 0:
             return
 
-        # def _should_delete_file(fpath):
-        #     return os.stat(fpath).st_mtime < (time.time() - (self._retention_days * 86400.0))
+        def _should_delete_file(fpath):
+            return os.stat(fpath).st_mtime < (time.time() - (self._retention_days * 86400.0))
 
-        # def _should_delete_dir(dpath):
-        #     return os.path.isdir(dpath) and not os.listdir(dpath)
+        def _should_delete_dir(dpath):
+            return os.path.isdir(dpath) and not os.listdir(dpath)
 
-        # files = filter(_should_delete_file, glob.glob(f"{self._log_dir}/**/*.log"))
-        # for f in files:
-        #     print(f"Deleting Log File: {f}")
-        #     os.remove(f)
+        files = filter(_should_delete_file, glob.glob(f"{self._base_log_dir}/**/*.log"))
+        # Type ignore hints due to mypy bugging out and detecting incorrect type...
+        for f in files:  # type: ignore
+            print(f"Deleting Log File: {f}")
+            os.remove(f)  # type: ignore
 
-        # dirs = filter(_should_delete_dir, os.listdir(self._log_dir))
-        # for d in dirs:
-        #     print(f"Deleting Directory: {d}")
-        #     os.rmdir(d)
+        dirs = filter(_should_delete_dir, [f"{self._base_log_dir}/{p}" for p in os.listdir(self._base_log_dir)])
+        for d in dirs:
+            print(f"Deleting Directory: {d}")
+            os.rmdir(d)
