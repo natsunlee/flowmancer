@@ -9,12 +9,20 @@ from pydantic import BaseModel
 from ..lifecycle import AsyncLifecycle
 
 _event_classes = dict()
+_logger_classes = dict()
 
 
 def log_event(t: type[SerializableLogEvent]) -> Any:
     if not issubclass(t, SerializableLogEvent):
         raise TypeError(f'Must extend `SerializableLogEvent` type: {t.__name__}')
     _event_classes[t.__name__] = t
+    return t
+
+
+def logger(t: type[Logger]) -> Any:
+    if not issubclass(t, Logger):
+        raise TypeError(f'Must extend `Logger` type: {t.__name__}')
+    _logger_classes[t.__name__] = t
     return t
 
 

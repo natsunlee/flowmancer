@@ -9,7 +9,7 @@ from fmancer.loggers import LogWriteEvent, Severity
 
 # ADD EXECUTOR TESTS
 def test_add_executor(test_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=test_task_cls)
     assert (
         len(f._executors) == 1
@@ -21,7 +21,7 @@ def test_add_executor(test_task_cls):
 
 
 def test_add_executor_by_str_name(test_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class="TestTask")
     assert (
         len(f._executors) == 1
@@ -33,7 +33,7 @@ def test_add_executor_by_str_name(test_task_cls):
 
 
 def test_add_executors_with_deps(test_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=test_task_cls)
     f.add_executor(name="b", task_class=test_task_cls)
     f.add_executor(name="c", task_class=test_task_cls, deps=["a", "b"])
@@ -50,7 +50,7 @@ def test_add_executors_with_deps(test_task_cls):
 
 
 def test_successful_deps_validation(test_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=test_task_cls)
     f.add_executor(name="b", task_class=test_task_cls)
     f.add_executor(name="c", task_class=test_task_cls, deps=["a", "b"])
@@ -59,13 +59,13 @@ def test_successful_deps_validation(test_task_cls):
 
 
 def test_failed_deps_validation_missing_dep(test_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=test_task_cls, deps=["x"])
     assert not f._dependencies_are_valid()
 
 
 def test_failed_deps_validation_self_ref(test_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=test_task_cls, deps=["a"])
     assert not f._dependencies_are_valid()
 
@@ -73,7 +73,7 @@ def test_failed_deps_validation_self_ref(test_task_cls):
 @pytest.mark.asyncio
 async def test_synchro_ends():
     root_event = asyncio.Event()
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f._states[ExecutionState.INIT].add('test')
     tasks = f._init_executors(root_event)
     root_event.set()
@@ -83,7 +83,7 @@ async def test_synchro_ends():
 @pytest.mark.asyncio
 async def test_log_pusher_ends_root_event():
     root_event = asyncio.Event()
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     tasks = f._init_loggers(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
@@ -92,7 +92,7 @@ async def test_log_pusher_ends_root_event():
 @pytest.mark.asyncio
 async def test_log_pusher_ends_empty_queue():
     root_event = asyncio.Event()
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f._log_queue.put(LogWriteEvent(name="test", severity=Severity.INFO, message="test"))
     tasks = f._init_loggers(root_event)
     root_event.set()
@@ -102,7 +102,7 @@ async def test_log_pusher_ends_empty_queue():
 @pytest.mark.asyncio
 async def test_observer_pusher_ends_root_event():
     root_event = asyncio.Event()
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     tasks = f._init_observers(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
@@ -111,7 +111,7 @@ async def test_observer_pusher_ends_root_event():
 @pytest.mark.asyncio
 async def test_observer_pusher_ends_empty_queue():
     root_event = asyncio.Event()
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f._event_queue.put("test")
     tasks = f._init_observers(root_event)
     root_event.set()
@@ -121,7 +121,7 @@ async def test_observer_pusher_ends_empty_queue():
 @pytest.mark.asyncio
 async def test_all_pusher_ends_empty_queue():
     root_event = asyncio.Event()
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f._log_queue.put(LogWriteEvent(name="test", severity=Severity.INFO, message="test"))
     f._event_queue.put("test")
     tasks = f._init_observers(root_event) + f._init_loggers(root_event)
@@ -132,7 +132,7 @@ async def test_all_pusher_ends_empty_queue():
 # EXECUTOR RUN TESTS
 @pytest.mark.asyncio
 async def test_single_executor_success_run_initiate(success_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=success_task_cls)
     retcode = await f._initiate()
     assert (
@@ -144,7 +144,7 @@ async def test_single_executor_success_run_initiate(success_task_cls):
 
 
 def test_single_executor_success_run(success_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=success_task_cls)
     retcode = f.start()
     assert (
@@ -156,7 +156,7 @@ def test_single_executor_success_run(success_task_cls):
 
 
 def test_multiple_executor_success_run(success_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=success_task_cls)
     f.add_executor(name="b", task_class=success_task_cls)
     f.add_executor(name="c", task_class=success_task_cls, deps=["a", "b"])
@@ -174,7 +174,7 @@ def test_multiple_executor_success_run(success_task_cls):
 
 
 def test_multiple_executor_fail_run(success_task_cls, fail_task_cls):
-    f = Flowmancer()
+    f = Flowmancer(test=True)
     f.add_executor(name="a", task_class=success_task_cls)
     f.add_executor(name="b", task_class=fail_task_cls)
     f.add_executor(name="c", task_class=success_task_cls, deps=["a", "b"])

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, TextIO
 
 from . import (LogEndEvent, Logger, LogStartEvent, LogWriteEvent,
-               SerializableLogEvent)
+               SerializableLogEvent, logger)
 
 
 class LogFileIsAlreadyOpen(Exception):
@@ -16,6 +16,7 @@ class LogFileNotOpen(Exception):
     pass
 
 
+@logger
 class FileLogger(Logger):
     def __init__(self, **kwargs: str) -> None:
         self._base_log_dir = kwargs.get("log_dir", "./logs")

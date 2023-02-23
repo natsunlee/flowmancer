@@ -7,7 +7,7 @@ from enum import Enum
 from multiprocessing import Process
 from queue import Queue
 from typing import (Any, AsyncIterator, Callable, Coroutine, Dict, Optional,
-                    Type, Union, cast)
+                    Set, Type, Union, cast)
 
 from pydantic import BaseModel
 
@@ -32,6 +32,29 @@ class ExecutionState(Enum):
     ABORTED = "A"
     SKIP = "S"
     INIT = "_"
+
+
+class ExecutionStateMap:
+    def __init__(self) -> None:
+        self.data: Dict[ExecutionState, Set[str]] = dict()
+
+    def __getitem__(self, k: Union[str, ExecutionState]) -> Set[str]:
+        es = ExecutionState(k)
+        if es not in self.data:
+            self.data[es] = set()
+        return self.data[ExecutionState(k)]
+
+    def __str__(self):
+        return str(self.data)
+
+    def items(self):
+        return self.data.items()
+
+    def keys(self):
+        return self.data.keys()
+
+    def values(self):
+        return self.data.values()
 
 
 class SerializableExecutionEvent(BaseModel):
@@ -129,9 +152,6 @@ class Executor:
             # Need to wait for main loop to initiate before spawning Event
             self.event = asyncio.Event()
 
-            # Trigger a state change from NONE -> PENDING
-            self.state = ExecutionState.PENDING
-
             # In the event of a restart and this task is already complete, return immediately.
             if self.state == ExecutionState.COMPLETED:
                 self.event.set()
@@ -146,6 +166,9 @@ class Executor:
             if self.state == ExecutionState.SKIP:
                 self.event.set()
                 return
+
+            # Trigger a state change from NONE -> PENDING
+            self.state = ExecutionState.PENDING
 
             attempts = 0
             while attempts < self.max_attempts and self.state == ExecutionState.PENDING:

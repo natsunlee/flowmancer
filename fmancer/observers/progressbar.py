@@ -7,9 +7,10 @@ from rich.progress import Progress
 
 from ..executor import (ExecutionState, ExecutionStateTransition,
                         SerializableExecutionEvent)
-from . import Observer
+from . import Observer, observer
 
 
+@observer
 class RichProgressBar(Observer):
     def _update_pbar(self, advance: int = 0) -> None:
         pending = self.state_counts[ExecutionState.PENDING]
