@@ -1,9 +1,10 @@
 import yaml
 from pyaml_env import parse_config
 
-from . import JobDefinition, SerializableJobDefinition
+from . import JobDefinition, SerializableJobDefinition, job_definition
 
 
+@job_definition('yaml')
 class YAMLJobDefinition(SerializableJobDefinition):
     def load(self, filename: str) -> JobDefinition:
         j = parse_config(filename)

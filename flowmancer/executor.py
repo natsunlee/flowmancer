@@ -5,6 +5,7 @@ import inspect
 from contextlib import asynccontextmanager
 from enum import Enum
 from multiprocessing import Process
+from multiprocessing.managers import DictProxy
 from queue import Queue
 from typing import (Any, AsyncIterator, Callable, Coroutine, Dict, Optional,
                     Set, Type, Union, cast)
@@ -95,7 +96,7 @@ class Executor:
         "max_attempts",
         "backoff",
         "event_queue",
-        "name",
+        "name"
     )
 
     def __init__(
@@ -104,15 +105,16 @@ class Executor:
         task_class: Union[str, Type[Task]],
         log_queue: Optional[Queue[Any]] = None,
         event_queue: Optional[Queue[Any]] = None,
+        shared_dict: Optional[Union[DictProxy[str, Any], Dict[str, Any]]] = None,
         semaphore: Optional[asyncio.Semaphore] = None,
         max_attempts: int = 1,
         backoff: int = 0,
         await_dependencies: Optional[Callable[[], Coroutine[Any, Any, bool]]] = None,
     ) -> None:
         if inspect.isclass(task_class) and issubclass(task_class, Task):
-            self.task_instance = task_class(name, log_queue)
+            self.task_instance = task_class(name, log_queue, shared_dict)
         else:
-            self.task_instance = _task_classes[cast(str, task_class)](name, log_queue)
+            self.task_instance = _task_classes[cast(str, task_class)](name, log_queue, shared_dict)
         self.name = name
         self.max_attempts = max_attempts
         self.semaphore = semaphore

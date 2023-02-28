@@ -4,9 +4,10 @@ import signal
 import sys
 import traceback
 from abc import ABC, abstractmethod
+from multiprocessing.managers import DictProxy
 from multiprocessing.sharedctypes import Value
 from queue import Queue
-from typing import Any, Dict, Iterable, Optional, TextIO, cast
+from typing import Any, Dict, Iterable, Optional, TextIO, Union, cast
 
 from .lifecycle import Lifecycle
 from .loggers import (LogEndEvent, LogStartEvent, LogWriteEvent,
@@ -49,11 +50,16 @@ class LogWriter:
 
 
 class Task(ABC, Lifecycle):
-    __slots__ = ("_log_queue", "stash")
+    __slots__ = ("_log_queue", "shared_dict")
 
-    def __init__(self, name: str, log_queue: Optional[Queue[Any]]) -> None:
+    def __init__(
+        self,
+        name: str,
+        log_queue: Optional[Queue[Any]] = None,
+        shared_dict: Optional[Union[DictProxy[str, Any], Dict[str, Any]]] = None
+    ) -> None:
         self.name = name
-        self.stash: Dict[str, Any] = dict()
+        self.shared_dict = shared_dict if shared_dict is not None else dict()
         self._log_queue = log_queue
         self._is_failed = Value("i", 0)
 

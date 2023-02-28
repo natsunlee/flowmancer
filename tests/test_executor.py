@@ -3,8 +3,8 @@ from multiprocessing import Manager
 
 import pytest
 
-from fmancer.executor import (ExecutionState, ExecutionStateTransition,
-                              Executor, SerializableExecutionEvent)
+from flowmancer.executor import (ExecutionState, ExecutionStateTransition,
+                                 Executor, SerializableExecutionEvent)
 
 
 @pytest.fixture(scope="module")
@@ -14,33 +14,26 @@ def manager():
 
 @pytest.mark.asyncio
 async def test_simple_executor_str_class_name(manager):
-    q = manager.Queue()
-    ex = Executor(name="test", task_class="TestTask", log_queue=q, semaphore=asyncio.Semaphore(1))
+    d = manager.dict()
+    ex = Executor(name="test", task_class="TestTask", shared_dict=d, semaphore=asyncio.Semaphore(1))
     await ex.start()
-    msg = q.get()
-    assert msg == "hello"
+    assert d["myvar"] == "hello"
 
 
 @pytest.mark.asyncio
 async def test_simple_executor_class_type(manager, test_task_cls):
-    q = manager.Queue()
-    ex = Executor(name="test", task_class=test_task_cls, log_queue=q, semaphore=asyncio.Semaphore(1))
+    d = manager.dict()
+    ex = Executor(name="test", task_class=test_task_cls, shared_dict=d, semaphore=asyncio.Semaphore(1))
     await ex.start()
-    msg = q.get()
-    assert msg == "hello"
+    assert d["myvar"] == "hello"
 
 
 @pytest.mark.asyncio
 async def test_repeated_fail(manager):
-    q = manager.Queue()
-    ex = Executor(name="test", task_class="FailTask", log_queue=q, max_attempts=3)
+    d = manager.dict()
+    ex = Executor(name="test", task_class="FailTask", shared_dict=d, max_attempts=3)
     await ex.start()
-    result = []
-    while not q.empty():
-        val = q.get().strip()
-        if val == "fail":
-            result.append(val)
-    assert result == ["fail"] * 3
+    assert d["fail_counter"] == 3
 
 
 def test_state_transition(manager):

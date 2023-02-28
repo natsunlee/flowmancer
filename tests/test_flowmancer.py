@@ -2,9 +2,9 @@ import asyncio
 
 import pytest
 
-from fmancer.executor import ExecutionState
-from fmancer.flowmancer import Flowmancer
-from fmancer.loggers import LogWriteEvent, Severity
+from flowmancer.executor import ExecutionState
+from flowmancer.flowmancer import Flowmancer
+from flowmancer.loggers import LogWriteEvent, Severity
 
 
 # ADD EXECUTOR TESTS

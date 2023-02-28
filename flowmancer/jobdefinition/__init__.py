@@ -1,7 +1,20 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Type, Union
 
 from pydantic import BaseModel
+
+_job_definition_classes = dict()
+
+
+def job_definition(key: str) -> Callable:
+    def inner(t: type[SerializableJobDefinition]) -> Type[SerializableJobDefinition]:
+        if not issubclass(t, SerializableJobDefinition):
+            raise TypeError(f'Must extend `SerializableJobDefinition` type: {t.__name__}')
+        _job_definition_classes[key] = t
+        return t
+    return inner
 
 
 class LoggerDefinition(BaseModel):

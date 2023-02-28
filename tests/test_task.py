@@ -1,8 +1,9 @@
 from multiprocessing import Manager
+from typing import Any, Dict
 
 import pytest
 
-from fmancer.task import Task, _task_classes, task
+from flowmancer.task import Task, _task_classes, task
 
 
 @pytest.fixture(scope="module")
@@ -28,23 +29,13 @@ def test_task_deco_exception():
                 return
 
 
-def test_task_lifecycle_order_success(manager, lifecycle_success_task_cls):
-    q = manager.Queue()
-    lifecycle_success_task_cls(q).run_lifecycle()
-    result = []
-    while not q.empty():
-        val = q.get().strip()
-        if val:
-            result.append(val)
-    assert result == ["on_create", "run", "on_success", "on_destroy"]
+def test_task_lifecycle_order_success(lifecycle_success_task_cls):
+    d: Dict[str, Any] = dict()
+    lifecycle_success_task_cls("success", shared_dict=d).run_lifecycle()
+    assert d["events"] == ["on_create", "run", "on_success", "on_destroy"]
 
 
-def test_task_lifecycle_order_fail(manager, lifecycle_fail_task_cls):
-    q = manager.Queue()
-    lifecycle_fail_task_cls(q).run_lifecycle()
-    result = []
-    while not q.empty():
-        val = q.get().strip()
-        if val:
-            result.append(val)
-    assert result == ["on_create", "Failing!", "on_failure", "on_destroy"]
+def test_task_lifecycle_order_fail(lifecycle_fail_task_cls):
+    d: Dict[str, Any] = dict()
+    lifecycle_fail_task_cls("failure", shared_dict=d).run_lifecycle()
+    assert d["events"] == ["on_create", "Failing!", "on_failure", "on_destroy"]

@@ -26,7 +26,7 @@ class CheckpointContents:
     name: str
     states: ExecutionStateMap
     job_definition: JobDefinition
-    stash: Dict[Any, Any]
+    shared_dict: Dict[Any, Any]
 
 
 class Checkpoint(ABC):
