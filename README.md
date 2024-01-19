@@ -42,70 +42,40 @@ To use `flowmancer`, you'll need to provide a few things:
 ### Tasks
 A `flowmancer` task is simply a class that extends the `Task` abstract class, which, at minimum requires that the `run` method be implemented:
 ```python
-from flowmancer import Task
+from flowmancer import Task, task
 import time
 
+@task
 class WaitAndSucceed(Task):
     def run(self):
-        self.logger.info("Starting up and sleeping for 5 seconds!")
+        print("Starting up and sleeping for 5 seconds!")
         time.sleep(5)
-        self.logger.info("Done!")
+        print("Done!")
 
+@task
 class FailImmediately(Task):
     def run(self):
         raise RuntimeError("Let this be caught by Flowmancer")
 ```
 
-Being an extension of the `Task` you'll have a few features available, however, in the above example we only use the `self.logger`. This will write the log message to any configured logging system (zero or more loggers may be defined).
+Any `print()` or exceptions will write log messages to any configured loggers (zero or more loggers may be defined).
 
-### Job YAML File
+### Job Definition YAML File
 This file describes what code to run, in what order, as well as additional add-ons to supplement the job during execution:
 ```yaml
 version: 0.1
 
-name: my_project
-
-# Make sure the tasks directory is in the PYTHONPATH
-pypath:
-  - ./tasks
-
-loggers:
-  # Assign only a file logger for this job
-  file-logger:
-    module: flowmancer.loggers.file
-    logger: FileLogger
-    kwargs:
-      log_dir: ./logs
-      retention_days: 0
-
-observers:
-  # Saves state of the job in case of failures
-  # to allow restart from point-of-failure
-  checkpoint:
-    module: flowmancer.observers.checkpoint
-    observer: Checkpoint
-    kwargs:
-      checkpoint_name: my_project
-      checkpoint_dir: ./checkpoint
-  # Show progress bar on STDOUT to see job progress
-  progress-bar:
-    module: flowmancer.observers.progressbar
-    observer: RichProgressBar
-
 tasks:
   # No dependency - run right away
   succeed-task-a:
-    module: mytasks
     task: WaitAndSucceed
 
   # No dependency - run right away
   succeed-task-b:
-    module: mytasks
     task: WaitAndSucceed
 
   # Only run if prior 2 tasks complete successfully
   final-fail-task:
-    module: mytasks
     task: FailImmediately
     dependencies:
       - succeed-task-a
