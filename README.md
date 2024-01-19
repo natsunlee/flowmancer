@@ -85,17 +85,18 @@ tasks:
 ### Driver
 The driver is super simple and simply requires running an instance of `Flowmancer`
 ```python
+# main.py
 import sys
 from flowmancer import Flowmancer
 
 if __name__ == '__main__':
-    ret = Flowmancer("./job.yaml").start()
+    ret = Flowmancer().start()
     sys.exit(ret)
 ```
 
 ### Executing the Job
 ```bash
-python main.py
+python main.py -j ./path/to/job.yaml
 ```
 
 To run from point-of-failure (if any), if Checkpoint observer is enabled:
