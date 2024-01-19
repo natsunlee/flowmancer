@@ -18,7 +18,8 @@ from .executor import ExecutionStateMap, Executor
 from .jobdefinition import JobDefinition, TaskDefinition, _job_definition_classes
 from .loggers import Logger
 from .loggers.file import FileLogger
-from .observers import Observer
+from .observers import Observer, _observer_classes
+from .observers.notifications import pushover  # noqa: F401
 from .observers.progressbar import RichProgressBar
 from .task import Task
 
@@ -50,7 +51,7 @@ class Flowmancer:
         self._executors: Dict[str, ExecutorDetails] = dict()
         self._states = ExecutionStateMap()
         self._observer_interval_seconds = 0.25
-        self._registered_observers: List[Observer] = []
+        self._registered_observers: List[Observer] = [RichProgressBar()]
         self._registered_loggers: List[Logger] = []
         self._semaphore = asyncio.Semaphore(self.concurrency) if self.concurrency > 0 else None
         self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
@@ -182,7 +183,8 @@ class Flowmancer:
         return [asyncio.create_task(_pusher())]
 
     def _init_observers(self, root_event: asyncio.Event) -> List[asyncio.Task]:
-        self._registered_observers = [RichProgressBar()] if not self._test else []
+        if self._test:
+            self._registered_observers = []
 
         async def _pusher() -> None:
             for obs in self._registered_observers:
@@ -255,6 +257,11 @@ class Flowmancer:
                 name=n,
                 task_class=t.task,
                 deps=t.dependencies
+            )
+
+        for n, o in jobdef.observers.items():
+            self._registered_observers.append(
+                _observer_classes[o.observer](**o.kwargs)
             )
 
         return self

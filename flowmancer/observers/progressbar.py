@@ -5,8 +5,7 @@ from typing import Dict
 
 from rich.progress import Progress
 
-from ..executor import (ExecutionState, ExecutionStateTransition,
-                        SerializableExecutionEvent)
+from ..executor import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
 from . import Observer, observer
 
 
@@ -20,11 +19,11 @@ class RichProgressBar(Observer):
         total = (pending + running + failed + completed) or 100
         elapsed = int(time.time() - self.start_time)
         m = (
-            f"Pending: {pending} - "
-            + f"Running: {running} - "
-            + f"Completed: {completed} - "
-            + f"Failed: {failed} "
-            + f"(Elapsed: {elapsed} sec.)"
+            f'Pending: {pending} - '
+            + f'Running: {running} - '
+            + f'Completed: {completed} - '
+            + f'Failed: {failed} '
+            + f'(Elapsed: {elapsed} sec.)'
         )
         self.progress.update(self.task, description=m, advance=advance, total=total)
 
@@ -42,7 +41,7 @@ class RichProgressBar(Observer):
         self.start_time = time.time()
         self.progress = Progress()
         self._event = asyncio.Event()
-        self.task = self.progress.add_task("Pending: 0 - Running: 0 - Completed: 0 - Failed: 0")
+        self.task = self.progress.add_task('Pending: 0 - Running: 0 - Completed: 0 - Failed: 0')
         self.progress.start()
 
         loop = asyncio.get_event_loop()
