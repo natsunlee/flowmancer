@@ -22,7 +22,7 @@ Simply install the `flowmancer` package with:
 pip install flowmancer
 ```
 
-NOTE: `flowmancer` supports only Python 3.6 and higher.
+NOTE: `flowmancer` supports only Python 3.7 and higher.
 
 ## Usage
 Let's assume you have a new project with a basic structure like so:
