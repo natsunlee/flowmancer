@@ -1,10 +1,10 @@
 [tool.poetry]
-name = 'flowmancer'
-version = '0.4.8'
-description = 'The Python Thing-Doer'
-authors = ['Nathan Lee <lee.nathan.sh@outlook.com>']
-license = 'MIT'
-readme = 'README.md'
+name = "flowmancer"
+version = "0.4.9"
+description = "The Python Thing-Doer"
+authors = ["Nathan Lee <lee.nathan.sh@outlook.com>"]
+license = "MIT"
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = '^3.7'
