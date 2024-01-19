@@ -11,5 +11,5 @@ class YAMLJobDefinition(SerializableJobDefinition):
         return JobDefinition(**j)
 
     def dump(self, jdef: JobDefinition, filename: str) -> None:
-        with open(filename, "r") as f:
+        with open(filename, 'r') as f:
             f.write(yaml.dump(jdef.dict()))

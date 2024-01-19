@@ -7,17 +7,18 @@ from argparse import ArgumentParser
 from collections import namedtuple
 from multiprocessing import Manager
 from multiprocessing.managers import DictProxy
-from queue import Queue
 from typing import Any, Dict, List, Optional, Type, Union
 
 from .checkpoint import CheckpointContents, NoCheckpointAvailableError
 from .checkpoint.file import FileCheckpoint
-from .executor import (ExecutionState, ExecutionStateMap,
-                       ExecutionStateTransition, Executor,
-                       SerializableExecutionEvent)
+from .eventbus import EventBus
+from .eventbus.execution import (ExecutionState, ExecutionStateTransition,
+                                 SerializableExecutionEvent)
+from .eventbus.log import SerializableLogEvent
+from .executor import ExecutionStateMap, Executor
 from .jobdefinition import (JobDefinition, TaskDefinition,
                             _job_definition_classes)
-from .loggers import Logger, SerializableLogEvent
+from .loggers import Logger
 from .loggers.file import FileLogger
 from .observers import Observer
 from .observers.progressbar import RichProgressBar
@@ -39,13 +40,14 @@ def create_loop():
 
 
 class Flowmancer:
-    def __init__(self, name: str = 'flow', test: bool = False) -> None:
+    def __init__(self, name: str = 'flow', test: bool = False, debug: bool = False) -> None:
         manager = Manager()
         self.name = name
         self.concurrency = 0
         self._test = test
-        self._log_queue: Queue[Any] = manager.Queue()
-        self._event_queue: Queue[Any] = manager.Queue()
+        self._debug = debug
+        self._log_event_bus = EventBus[SerializableLogEvent](manager.Queue())
+        self._execution_event_bus = EventBus[SerializableExecutionEvent]()
         self._shared_dict: DictProxy[str, Any] = manager.dict()
         self._executors: Dict[str, ExecutorDetails] = dict()
         self._states = ExecutionStateMap()
@@ -56,7 +58,8 @@ class Flowmancer:
         self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
 
     def start(self) -> int:
-        self._process_cmd_args()
+        if not self._test:
+            self._process_cmd_args()
         return asyncio.run(self._initiate())
 
     async def _initiate(self) -> int:
@@ -71,13 +74,16 @@ class Flowmancer:
 
     def _process_cmd_args(self) -> None:
         parser = ArgumentParser(description='Flowmancer job execution options.')
-        parser.add_argument("-j", "--jobdef", action="store", dest="jobdef")
-        parser.add_argument("-r", "--restart", action="store_true", dest="restart", default=False)
-        parser.add_argument("--skip", action="append", dest="skip", default=[])
-        parser.add_argument("--run-to", action="store", dest="run_to")
-        parser.add_argument("--run-from", action="store", dest="run_from")
-        parser.add_argument("--max-parallel", action="store", type=int, dest="max_parallel")
+        parser.add_argument('-j', '--jobdef', action='store', dest='jobdef')
+        parser.add_argument('-r', '--restart', action='store_true', dest='restart', default=False)
+        parser.add_argument('-d', '--debug', action='store_true', dest='debug', default=False)
+        parser.add_argument('--skip', action='append', dest='skip', default=[])
+        parser.add_argument('--run-to', action='store', dest='run_to')
+        parser.add_argument('--run-from', action='store', dest='run_from')
+        parser.add_argument('--max-parallel', action='store', type=int, dest='max_parallel')
+
         args = parser.parse_args()
+        self._debug = args.debug
 
         if args.restart:
             try:
@@ -156,13 +162,21 @@ class Flowmancer:
         self._registered_loggers = [FileLogger()] if not self._test else []
 
         async def _pusher() -> None:
+            for log in self._registered_loggers:
+                await log.on_create()
             while True:
-                while not self._log_queue.empty():
-                    m = SerializableLogEvent.deserialize(self._log_queue.get())
+                while not self._log_event_bus.empty():
+                    m = self._log_event_bus.get()
                     for log in self._registered_loggers:
+                        # TODO: schedule the update as a task instead of awaiting
                         await log.update(m)
                 if root_event.is_set():
+                    is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
                     for log in self._registered_loggers:
+                        if is_failed:
+                            await log.on_failure()
+                        else:
+                            await log.on_success()
                         await log.on_destroy()
                     break
                 await asyncio.sleep(self._observer_interval_seconds)
@@ -176,15 +190,22 @@ class Flowmancer:
             for obs in self._registered_observers:
                 await obs.on_create()
             while True:
-                while not self._event_queue.empty():
-                    e = SerializableExecutionEvent.deserialize(self._event_queue.get())
+                while not self._execution_event_bus.empty():
+                    e = self._execution_event_bus.get()
+                    if self._debug:
+                        print(e)
                     if isinstance(e, ExecutionStateTransition):
-                        self._states[e.from_state].remove(e.name)
                         self._states[e.to_state].add(e.name)
+                        self._states[e.from_state].remove(e.name)
                     for obs in self._registered_observers:
                         await obs.update(e)
                 if root_event.is_set():
+                    is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
                     for obs in self._registered_observers:
+                        if is_failed:
+                            await obs.on_failure()
+                        else:
+                            await obs.on_success()
                         await obs.on_destroy()
                     break
                 await asyncio.sleep(self._observer_interval_seconds)
@@ -215,8 +236,8 @@ class Flowmancer:
         e = Executor(
             name=name,
             task_class=task_class,
-            log_queue=self._log_queue,
-            event_queue=self._event_queue,
+            log_event_bus=self._log_event_bus,
+            execution_event_bus=self._execution_event_bus,
             shared_dict=self._shared_dict,
             await_dependencies=await_dependencies,
             semaphore=self._semaphore
@@ -245,7 +266,7 @@ class Flowmancer:
         for n, e in self._executors.items():
             j.tasks[n] = (
                 TaskDefinition(
-                    task=type(e.instance.task_instance).__name__,
+                    task=type(e.instance.get_task_instance()).__name__,
                     dependencies=[]
                 )
             )

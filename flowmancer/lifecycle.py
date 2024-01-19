@@ -1,9 +1,4 @@
-from typing import Any, Tuple
-
-
 class Lifecycle:
-    __slots__ = tuple()  # type: ignore
-
     def on_create(self) -> None:
         # Optional lifecycle method
         pass
@@ -30,8 +25,6 @@ class Lifecycle:
 
 
 class AsyncLifecycle:
-    __slots__: Tuple[Any] = tuple()  # type: ignore
-
     async def on_create(self) -> None:
         # Optional lifecycle method
         pass

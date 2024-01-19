@@ -2,37 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import signal
+import sys
+import traceback
 from contextlib import asynccontextmanager
-from enum import Enum
 from multiprocessing import Process
 from multiprocessing.managers import DictProxy
-from queue import Queue
+from multiprocessing.sharedctypes import Value
 from typing import (Any, AsyncIterator, Callable, Coroutine, Dict, Optional,
-                    Set, Type, Union, cast)
+                    Set, TextIO, Type, Union, cast)
 
-from pydantic import BaseModel
-
+from .eventbus import EventBus
+from .eventbus.execution import (ExecutionState, ExecutionStateTransition,
+                                 SerializableExecutionEvent)
+from .eventbus.log import LogWriter, SerializableLogEvent
 from .task import Task, _task_classes
 
-_event_classes = dict()
 
-
-def event(t: type[SerializableExecutionEvent]) -> Any:
-    if not issubclass(t, SerializableExecutionEvent):
-        raise TypeError(f'Must extend `SerializableExecutionEvent` type: {t.__name__}')
-    _event_classes[t.__name__] = t
-    return t
-
-
-class ExecutionState(Enum):
-    FAILED = "F"
-    PENDING = "P"
-    RUNNING = "R"
-    DEFAULTED = "D"
-    COMPLETED = "C"
-    ABORTED = "A"
-    SKIP = "S"
-    INIT = "_"
+async def _default_await_dependencies() -> bool:
+    return True
 
 
 class ExecutionStateMap:
@@ -58,74 +46,97 @@ class ExecutionStateMap:
         return self.data.values()
 
 
-class SerializableExecutionEvent(BaseModel):
-    class Config:
-        use_enum_values = True
+class ProcessResult:
+    def __init__(self) -> None:
+        self._retcode = Value('i', 0)
 
-    def serialize(self) -> Dict[str, Any]:
-        return {"event": type(self).__name__, "body": self.dict()}
+    @property
+    def is_failed(self) -> bool:
+        return bool(self._retcode.value)  # type: ignore
 
-    @classmethod
-    def deserialize(cls, e: Dict[str, Any]) -> Any:
-        if "event" not in e or "body" not in e or not isinstance(e, dict):
-            return UnknownExecutionEvent(content=str(e))
+    @is_failed.setter
+    def is_failed(self, v: bool) -> None:
+        self._retcode.value = v  # type: ignore
+
+
+def exec_task_lifecycle(
+    task_name: str,
+    task_instance: Task,
+    log_event_bus: Optional[EventBus[SerializableLogEvent]],
+    result: ProcessResult,
+    shared_dict: Optional[Union[Dict[str, Any], DictProxy[str, Any]]] = None
+):
+    # Pydantic's BaseModel appears to interfere with the Manager objects when it serializes model values...
+    # As a result, any Manager objects should be assigned here directly after being split off into a new process.
+    if shared_dict is not None:
+        task_instance._shared_dict = cast(Dict[str, Any], shared_dict)
+
+    def _exec_lifecycle_stage(stage: Callable[[], None]) -> None:
+        try:
+            stage()
+        except Exception:
+            print(traceback.format_exc())
+            result.is_failed = True
+
+    # Bind signal only in new child process
+    signal.signal(signal.SIGTERM, lambda *_: _exec_lifecycle_stage(task_instance.on_abort))
+    writer = cast(TextIO, LogWriter(task_name, log_event_bus))
+
+    _sout = sys.stdout
+    _serr = sys.stderr
+
+    try:
+        sys.stdout = writer
+        sys.stderr = writer
+
+        _exec_lifecycle_stage(task_instance.on_create)
+
+        # if self.restart:
+        #    self._exec_lifecycle_stage(self.on_restart)
+
+        _exec_lifecycle_stage(task_instance.run)
+
+        if result.is_failed:
+            _exec_lifecycle_stage(task_instance.on_failure)
         else:
-            return _event_classes[e["event"]](**e["body"])
+            _exec_lifecycle_stage(task_instance.on_success)
+            result.is_failed = False
 
-
-@event
-class ExecutionStateTransition(SerializableExecutionEvent):
-    name: str
-    from_state: ExecutionState
-    to_state: ExecutionState
-
-
-@event
-class UnknownExecutionEvent(SerializableExecutionEvent):
-    content: str
+        _exec_lifecycle_stage(task_instance.on_destroy)
+    except Exception:
+        print(traceback.format_exc())
+        result.is_failed = True
+    finally:
+        writer.close()
+        sys.stdout = _sout
+        sys.stderr = _serr
 
 
 class Executor:
-    __slots__ = (
-        "event",
-        "proc",
-        "task_instance",
-        "semaphore",
-        "await_dependencies",
-        "_state",
-        "max_attempts",
-        "backoff",
-        "event_queue",
-        "name"
-    )
-
     def __init__(
         self,
         name: str,
         task_class: Union[str, Type[Task]],
-        log_queue: Optional[Queue[Any]] = None,
-        event_queue: Optional[Queue[Any]] = None,
+        log_event_bus: Optional[EventBus[SerializableLogEvent]] = None,
+        execution_event_bus: Optional[EventBus[SerializableExecutionEvent]] = None,
         shared_dict: Optional[Union[DictProxy[str, Any], Dict[str, Any]]] = None,
         semaphore: Optional[asyncio.Semaphore] = None,
         max_attempts: int = 1,
         backoff: int = 0,
-        await_dependencies: Optional[Callable[[], Coroutine[Any, Any, bool]]] = None,
+        await_dependencies: Callable[[], Coroutine[Any, Any, bool]] = _default_await_dependencies,
+        kwargs: Optional[Dict[str, Any]] = None
     ) -> None:
-        if inspect.isclass(task_class) and issubclass(task_class, Task):
-            self.task_instance = task_class(name, log_queue, shared_dict)
-        else:
-            self.task_instance = _task_classes[cast(str, task_class)](name, log_queue, shared_dict)
         self.name = name
+        self.log_event_bus = log_event_bus
+        self.execution_event_bus = execution_event_bus
+        self.shared_dict = shared_dict
         self.max_attempts = max_attempts
         self.semaphore = semaphore
-        self._state = ExecutionState.INIT
         self.backoff = backoff
-        self.event_queue = event_queue
-
-        async def _default_await_dependencies() -> bool:
-            return True
-
-        self.await_dependencies = await_dependencies or _default_await_dependencies
+        self.task_class = task_class
+        self.kwargs = kwargs
+        self.await_dependencies = await_dependencies
+        self._state = ExecutionState.INIT
 
     @property
     def state(self) -> ExecutionState:
@@ -134,9 +145,18 @@ class Executor:
     @state.setter
     def state(self, val: ExecutionState) -> None:
         event = ExecutionStateTransition(name=self.name, from_state=self._state, to_state=val)
-        if self.event_queue is not None:
-            self.event_queue.put(event.serialize())
+        if self.execution_event_bus is not None:
+            self.execution_event_bus.put(event)
         self._state = val
+
+    def get_task_instance(self) -> Task:
+        kwargs = self.kwargs or dict()
+        if inspect.isclass(self.task_class) and issubclass(self.task_class, Task):
+            return self.task_class(**kwargs)
+        elif type(self.task_class) == str:
+            return _task_classes[self.task_class](**kwargs)
+        else:
+            raise TypeError('The `task_class` param must be either an extension of `Task` or the string name of one.')
 
     @asynccontextmanager
     async def acquire_lock(self) -> AsyncIterator[Any]:
@@ -159,6 +179,9 @@ class Executor:
                 self.event.set()
                 return
 
+            # Trigger a state change from INIT -> PENDING
+            self.state = ExecutionState.PENDING
+
             if not await self.await_dependencies():
                 self.state = ExecutionState.DEFAULTED
                 self.event.set()
@@ -169,25 +192,31 @@ class Executor:
                 self.event.set()
                 return
 
-            # Trigger a state change from NONE -> PENDING
-            self.state = ExecutionState.PENDING
-
             attempts = 0
+            result = ProcessResult()
             while attempts < self.max_attempts and self.state == ExecutionState.PENDING:
                 async with self.acquire_lock():
+                    result.is_failed = False
                     self.state = ExecutionState.RUNNING
                     attempts += 1
-                    self.proc = Process(target=self.task_instance.run_lifecycle, daemon=False)
+                    self.proc = Process(
+                        target=exec_task_lifecycle,
+                        args=(self.name, self.get_task_instance(), self.log_event_bus, result, self.shared_dict),
+                        daemon=False
+                    )
                     self.proc.start()
                     loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, self.proc.join)
 
                 # Restart check
-                if self.task_instance.is_failed and (attempts < self.max_attempts):
+                if result.is_failed and (attempts < self.max_attempts):
                     self.state = ExecutionState.PENDING
                     await asyncio.sleep(self.backoff)
 
-            self.state = ExecutionState.FAILED if self.task_instance.is_failed else ExecutionState.COMPLETED
+            if result.is_failed:
+                self.state = ExecutionState.FAILED
+            else:
+                self.state = ExecutionState.COMPLETED
         except asyncio.CancelledError:
             self.terminate()
             self.state = ExecutionState.ABORTED

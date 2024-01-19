@@ -35,7 +35,7 @@ class RichProgressBar(Observer):
                 # Need to imitate do-while to ensure pbar is updated one final time
                 # before exiting loop due to Event set.
                 break
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
 
     async def on_create(self) -> None:
         self.state_counts: Dict[ExecutionState, int] = defaultdict(lambda: 0)

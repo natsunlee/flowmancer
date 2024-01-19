@@ -16,7 +16,7 @@ class FileCheckpoint(Checkpoint):
     def write_checkpoint(self, content: CheckpointContents) -> None:
         if not os.path.exists(self.checkpoint_dir):
             os.makedirs(self.checkpoint_dir, exist_ok=True)
-        tmp = self.checkpoint_dir / (self.checkpoint_name + ".tmp")
+        tmp = self.checkpoint_dir / (self.checkpoint_name + '.tmp')
         perm = self.checkpoint_file_path
         with open(tmp, 'wb') as f:
             pickle.dump(content, f)
@@ -27,8 +27,8 @@ class FileCheckpoint(Checkpoint):
     def read_checkpoint(self) -> CheckpointContents:
         checkpoint_file = self.checkpoint_file_path
         if not checkpoint_file.exists():
-            raise NoCheckpointAvailableError(f"Checkpoint file does not exist: {self.checkpoint_file_path}")
-        return pickle.load(open(checkpoint_file, "rb"))
+            raise NoCheckpointAvailableError(f'Checkpoint file does not exist: {self.checkpoint_file_path}')
+        return pickle.load(open(checkpoint_file, 'rb'))
 
     def clear_checkpoint(self) -> None:
         cfile = self.checkpoint_file_path
