@@ -9,12 +9,10 @@ from contextlib import asynccontextmanager
 from multiprocessing import Process
 from multiprocessing.managers import DictProxy
 from multiprocessing.sharedctypes import Value
-from typing import (Any, AsyncIterator, Callable, Coroutine, Dict, Optional,
-                    Set, TextIO, Type, Union, cast)
+from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Optional, Set, TextIO, Type, Union, cast
 
 from .eventbus import EventBus
-from .eventbus.execution import (ExecutionState, ExecutionStateTransition,
-                                 SerializableExecutionEvent)
+from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import LogWriter, SerializableLogEvent
 from .task import Task, _task_classes
 

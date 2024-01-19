@@ -12,12 +12,10 @@ from typing import Any, Dict, List, Optional, Type, Union
 from .checkpoint import CheckpointContents, NoCheckpointAvailableError
 from .checkpoint.file import FileCheckpoint
 from .eventbus import EventBus
-from .eventbus.execution import (ExecutionState, ExecutionStateTransition,
-                                 SerializableExecutionEvent)
+from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import SerializableLogEvent
 from .executor import ExecutionStateMap, Executor
-from .jobdefinition import (JobDefinition, TaskDefinition,
-                            _job_definition_classes)
+from .jobdefinition import JobDefinition, TaskDefinition, _job_definition_classes
 from .loggers import Logger
 from .loggers.file import FileLogger
 from .observers import Observer
