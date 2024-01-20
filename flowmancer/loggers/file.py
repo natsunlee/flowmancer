@@ -4,9 +4,8 @@ import time
 from datetime import datetime
 from typing import Dict, TextIO
 
-from ..eventbus.log import (LogEndEvent, LogStartEvent, LogWriteEvent,
-                            SerializableLogEvent)
-from . import Logger, logger
+from ..eventbus.log import LogEndEvent, LogStartEvent, LogWriteEvent, SerializableLogEvent
+from .logger import Logger, logger
 
 
 class LogFileIsAlreadyOpen(Exception):
@@ -23,9 +22,11 @@ class FileLogger(Logger):
         self._base_log_dir = kwargs.get('log_dir', './logs')
         ts_str = datetime.now().strftime('%Y-%m-%d.%H.%M.%S')
         self._log_dir = f'{self._base_log_dir}/{ts_str}'
-        os.makedirs(self._log_dir, exist_ok=True)
         self._file_handles: Dict[str, TextIO] = dict()
-        self._retention_days = 10
+        self._retention_days = 0
+
+    async def on_create(self) -> None:
+        os.makedirs(self._log_dir, exist_ok=True)
 
     async def update(self, msg: SerializableLogEvent) -> None:
         if isinstance(msg, LogStartEvent):

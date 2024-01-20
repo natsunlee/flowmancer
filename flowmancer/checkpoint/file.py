@@ -2,8 +2,7 @@ import os
 import pickle
 from pathlib import Path
 
-from . import (Checkpoint, CheckpointContents, NoCheckpointAvailableError,
-               checkpoint)
+from .checkpoint import Checkpoint, CheckpointContents, NoCheckpointAvailableError, checkpoint
 
 
 @checkpoint

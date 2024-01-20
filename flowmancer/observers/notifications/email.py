@@ -2,8 +2,8 @@ import smtplib
 from email.message import EmailMessage
 from typing import Dict
 
-from .. import observer
-from . import Notification
+from ..observer import observer
+from .notification import Notification
 
 
 @observer

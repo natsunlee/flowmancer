@@ -24,10 +24,6 @@ class Task(ABC, BaseModel, Lifecycle):
     def shared_dict(self) -> Dict[str, Any]:
         return self._shared_dict
 
-    # def __init__(self, **kwargs) -> None:
-    #     self._shared_dict = kwargs.pop('_shared_dict', None) or dict()  # In case the param is given with None value.
-    #     super().__init__(**kwargs)
-
     class Config:
         extra = Extra.forbid
         underscore_attrs_are_private = True

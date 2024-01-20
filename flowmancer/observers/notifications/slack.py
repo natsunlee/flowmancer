@@ -3,8 +3,8 @@ from typing import Dict
 
 import requests
 
-from .. import observer
-from . import Notification
+from ..observer import observer
+from .notification import Notification
 
 
 @observer

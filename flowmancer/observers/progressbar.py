@@ -6,7 +6,7 @@ from typing import Dict
 from rich.progress import Progress
 
 from ..executor import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
-from . import Observer, observer
+from .observer import Observer, observer
 
 
 @observer

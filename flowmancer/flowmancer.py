@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib
+import inspect
+import os
+import pkgutil
+import sys
 import time
 from argparse import ArgumentParser
 from collections import namedtuple
@@ -15,12 +20,10 @@ from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import SerializableLogEvent
 from .executor import ExecutionStateMap, Executor
-from .jobdefinition import file  # noqa: F401
 from .jobdefinition import JobDefinition, TaskDefinition, _job_definition_classes
-from .loggers import Logger
 from .loggers.file import FileLogger
-from .observers import Observer, _observer_classes
-from .observers.notifications import pushover  # noqa: F401
+from .loggers.logger import Logger, _logger_classes
+from .observers.observer import Observer, _observer_classes
 from .observers.progressbar import RichProgressBar
 from .task import Task
 
@@ -29,9 +32,13 @@ __all__ = ['Flowmancer']
 ExecutorDetails = namedtuple('ExecutorDetails', 'instance dependencies')
 
 
+class NoTasksLoadedError(Exception):
+    pass
+
+
 # Need to explicitly manage loop in case multiple instances of Flowmancer are run.
 @contextlib.contextmanager
-def create_loop():
+def _create_loop():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     yield loop
@@ -39,11 +46,23 @@ def create_loop():
     loop.close()
 
 
+def _load_extensions(path: str, add_to_path: bool = True, package_chain: List[str] = []):
+    if not path.startswith('/'):
+        path = os.path.join(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])), path)
+    if add_to_path:
+        sys.path.append(path)
+    for x in pkgutil.iter_modules(path=[path]):
+        if x.ispkg:
+            _load_extensions(os.path.join(path, x.name), False, package_chain+[x.name])
+        else:
+            importlib.import_module('.'.join(package_chain+[x.name]))
+
+
 class Flowmancer:
-    def __init__(self, name: str = 'flow', test: bool = False, debug: bool = False) -> None:
+    def __init__(self, name: str = 'flowmancer', test: bool = False, debug: bool = False) -> None:
         manager = Manager()
         self.name = name
-        self.concurrency = 0
+        self._concurrency = 0
         self._test = test
         self._debug = debug
         self._log_event_bus = EventBus[SerializableLogEvent](manager.Queue())
@@ -53,17 +72,37 @@ class Flowmancer:
         self._states = ExecutionStateMap()
         self._observer_interval_seconds = 0.25
         self._registered_observers: List[Observer] = [RichProgressBar()]
-        self._registered_loggers: List[Logger] = []
-        self._semaphore = asyncio.Semaphore(self.concurrency) if self.concurrency > 0 else None
+        self._registered_loggers: List[Logger] = [FileLogger()]
+        self._semaphore: Optional[asyncio.Semaphore] = None
         self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
 
+    @property
+    def concurrency(self) -> int:
+        return self._concurrency
+
+    @concurrency.setter
+    def concurrency(self, v: int) -> None:
+        self._concurrency = v
+        self._semaphore = asyncio.Semaphore(v) if v > 0 else None
+
     def start(self) -> int:
-        if not self._test:
-            self._process_cmd_args()
-        return asyncio.run(self._initiate())
+        orig_cwd = os.getcwd()
+        try:
+            # Ensure any components, such as file loggers, work with respect to the caller's project dir.
+            os.chdir(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])))
+            if not self._test:
+                self._process_cmd_args()
+            if not self._executors:
+                raise NoTasksLoadedError(
+                    'No Tasks have been loaded! Please check that you have provided a valid Job Definition file.'
+                )
+            ret = asyncio.run(self._initiate())
+            return ret
+        finally:
+            os.chdir(orig_cwd)
 
     async def _initiate(self) -> int:
-        with create_loop():
+        with _create_loop():
             root_event = asyncio.Event()
             observer_tasks = self._init_observers(root_event)
             executor_tasks = self._init_executors(root_event)
@@ -159,7 +198,8 @@ class Flowmancer:
         ]
 
     def _init_loggers(self, root_event: asyncio.Event) -> List[asyncio.Task]:
-        self._registered_loggers = [FileLogger()] if not self._test else []
+        if self._test:
+            self._registered_loggers = []
 
         async def _pusher() -> None:
             for log in self._registered_loggers:
@@ -225,7 +265,14 @@ class Flowmancer:
                     return False
         return True
 
-    def add_executor(self, name: str, task_class: Union[str, Type[Task]], deps: Optional[List[str]] = None) -> None:
+    def add_executor(
+        self,
+        name: str,
+        task_class: Union[str, Type[Task]],
+        deps: Optional[List[str]] = None,
+        max_attempts: int = 1,
+        backoff: int = 0
+    ) -> None:
         async def await_dependencies() -> bool:
             for dep_name in self._executors[name].dependencies:
                 d = self._executors[dep_name].instance
@@ -241,7 +288,9 @@ class Flowmancer:
             execution_event_bus=self._execution_event_bus,
             shared_dict=self._shared_dict,
             await_dependencies=await_dependencies,
-            semaphore=self._semaphore
+            semaphore=self._semaphore,
+            max_attempts=max_attempts,
+            backoff=backoff
         )
 
         self._executors[name] = ExecutorDetails(instance=e, dependencies=(deps or []))
@@ -253,16 +302,36 @@ class Flowmancer:
         else:
             jobdef = _job_definition_classes[filetype]().load(j)
 
+        # Configurations
+        self.name = jobdef.config.name
+        self.concurrency = jobdef.config.concurrency
+
+        # Recursively import any modules found in the following paths in order to trigger the registration of any
+        # decorated classes.
+        search_paths = ['./tasks', './plugins', './extensions'] + jobdef.config.extension_directories
+        for p in search_paths:
+            _load_extensions(p)
+
+        # Tasks
         for n, t in jobdef.tasks.items():
             self.add_executor(
                 name=n,
                 task_class=t.task,
-                deps=t.dependencies
+                deps=t.dependencies,
+                max_attempts=t.max_attempts,
+                backoff=t.backoff
             )
 
-        for n, o in jobdef.observers.items():
+        # Observers
+        for _, o in jobdef.observers.items():
             self._registered_observers.append(
                 _observer_classes[o.observer](**o.kwargs)
+            )
+
+        # Loggers
+        for _, l in jobdef.loggers.items():
+            self._registered_loggers.append(
+                _logger_classes[l.logger](**l.kwargs)
             )
 
         return self
