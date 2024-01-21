@@ -23,8 +23,8 @@ from .executor import ExecutionStateMap, Executor
 from .jobdefinition import JobDefinition, TaskDefinition, _job_definition_classes
 from .loggers.file import FileLogger
 from .loggers.logger import Logger, _logger_classes
-from .observers.observer import Observer, _observer_classes
-from .observers.progressbar import RichProgressBar
+from .plugins.plugin import Plugin, _plugin_classes
+from .plugins.progressbar import RichProgressBar
 from .task import Task
 
 __all__ = ['Flowmancer']
@@ -70,8 +70,8 @@ class Flowmancer:
         self._shared_dict: DictProxy[str, Any] = manager.dict()
         self._executors: Dict[str, ExecutorDetails] = dict()
         self._states = ExecutionStateMap()
-        self._observer_interval_seconds = 0.25
-        self._registered_observers: List[Observer] = [RichProgressBar()]
+        self._tick_interval_seconds = 0.25
+        self._registered_plugins: List[Plugin] = [RichProgressBar()]
         self._registered_loggers: List[Logger] = [FileLogger()]
         self._semaphore: Optional[asyncio.Semaphore] = None
         self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
@@ -104,7 +104,7 @@ class Flowmancer:
     async def _initiate(self) -> int:
         with _create_loop():
             root_event = asyncio.Event()
-            observer_tasks = self._init_observers(root_event)
+            observer_tasks = self._init_plugins(root_event)
             executor_tasks = self._init_executors(root_event)
             logger_tasks = self._init_loggers(root_event)
             checkpoint_task = self._init_checkpointer(root_event)
@@ -175,7 +175,7 @@ class Flowmancer:
                         self._checkpoint.clear_checkpoint()
                     break
                 else:
-                    await asyncio.sleep(self._observer_interval_seconds)
+                    await asyncio.sleep(self._tick_interval_seconds)
 
         return asyncio.create_task(_write_checkpoint())
 
@@ -189,7 +189,7 @@ class Flowmancer:
                 ):
                     root_event.set()
                 else:
-                    await asyncio.sleep(self._observer_interval_seconds)
+                    await asyncio.sleep(self._tick_interval_seconds)
 
         return [asyncio.create_task(_synchro())] + [
             asyncio.create_task(dtl.instance.start())
@@ -219,16 +219,16 @@ class Flowmancer:
                             await log.on_success()
                         await log.on_destroy()
                     break
-                await asyncio.sleep(self._observer_interval_seconds)
+                await asyncio.sleep(self._tick_interval_seconds)
 
         return [asyncio.create_task(_pusher())]
 
-    def _init_observers(self, root_event: asyncio.Event) -> List[asyncio.Task]:
+    def _init_plugins(self, root_event: asyncio.Event) -> List[asyncio.Task]:
         if self._test:
-            self._registered_observers = []
+            self._registered_plugins = []
 
         async def _pusher() -> None:
-            for obs in self._registered_observers:
+            for obs in self._registered_plugins:
                 await obs.on_create()
             while True:
                 while not self._execution_event_bus.empty():
@@ -238,18 +238,18 @@ class Flowmancer:
                     if isinstance(e, ExecutionStateTransition):
                         self._states[e.to_state].add(e.name)
                         self._states[e.from_state].remove(e.name)
-                    for obs in self._registered_observers:
+                    for obs in self._registered_plugins:
                         await obs.update(e)
                 if root_event.is_set():
                     is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
-                    for obs in self._registered_observers:
+                    for obs in self._registered_plugins:
                         if is_failed:
                             await obs.on_failure()
                         else:
                             await obs.on_success()
                         await obs.on_destroy()
                     break
-                await asyncio.sleep(self._observer_interval_seconds)
+                await asyncio.sleep(self._tick_interval_seconds)
 
         return [asyncio.create_task(_pusher())]
 
@@ -323,9 +323,9 @@ class Flowmancer:
             )
 
         # Observers
-        for _, o in jobdef.observers.items():
-            self._registered_observers.append(
-                _observer_classes[o.observer](**o.kwargs)
+        for _, o in jobdef.plugins.items():
+            self._registered_plugins.append(
+                _plugin_classes[o.plugin](**o.kwargs)
             )
 
         # Loggers

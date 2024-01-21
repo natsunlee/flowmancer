@@ -36,8 +36,8 @@ class TaskDefinition(JobDefinitionComponent):
     kwargs: Dict[str, Union[int, str]] = dict()
 
 
-class ObserverDefinition(JobDefinitionComponent):
-    observer: str
+class PluginDefinition(JobDefinitionComponent):
+    plugin: str
     kwargs: Dict[str, Union[int, str]] = dict()
 
 
@@ -52,7 +52,7 @@ class JobDefinition(JobDefinitionComponent):
     config: Configuration = Configuration()
     tasks: Dict[str, TaskDefinition]
     loggers: Dict[str, LoggerDefinition] = dict()
-    observers: Dict[str, ObserverDefinition] = dict()
+    plugins: Dict[str, PluginDefinition] = dict()
 
 
 class SerializableJobDefinition(ABC):
