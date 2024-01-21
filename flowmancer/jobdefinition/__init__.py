@@ -43,8 +43,9 @@ class ExtensionDefinition(JobDefinitionComponent):
 
 class Configuration(JobDefinitionComponent):
     name: str = 'flowmancer'
-    concurrency: int = 0
+    max_concurrency: int = 0
     extension_directories: List[str] = []
+    extension_packages: List[str] = []
 
 
 class JobDefinition(JobDefinitionComponent):

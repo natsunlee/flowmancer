@@ -7,7 +7,6 @@ from typing import Any, Dict
 from pydantic import BaseModel, Extra
 
 from ..executor import ExecutionStateMap
-from ..jobdefinition import JobDefinition
 
 _checkpoint_classes = dict()
 
@@ -27,7 +26,6 @@ class NoCheckpointAvailableError(Exception):
 class CheckpointContents:
     name: str
     states: ExecutionStateMap
-    job_definition: JobDefinition
     shared_dict: Dict[Any, Any]
 
 

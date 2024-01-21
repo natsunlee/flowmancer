@@ -62,7 +62,8 @@ def exec_task_lifecycle(
     task_instance: Task,
     log_event_bus: Optional[EventBus[SerializableLogEvent]],
     result: ProcessResult,
-    shared_dict: Optional[Union[Dict[str, Any], DictProxy[str, Any]]] = None
+    shared_dict: Optional[Union[Dict[str, Any], DictProxy[str, Any]]] = None,
+    is_restart: bool = False
 ):
     # Pydantic's BaseModel appears to interfere with the Manager objects when it serializes model values...
     # As a result, any Manager objects should be assigned here directly after being split off into a new process.
@@ -89,8 +90,8 @@ def exec_task_lifecycle(
 
         _exec_lifecycle_stage(task_instance.on_create)
 
-        # if self.restart:
-        #    self._exec_lifecycle_stage(self.on_restart)
+        if is_restart:
+            _exec_lifecycle_stage(task_instance.on_restart)
 
         _exec_lifecycle_stage(task_instance.run)
 
@@ -122,6 +123,7 @@ class Executor:
         max_attempts: int = 1,
         backoff: int = 0,
         await_dependencies: Callable[[], Coroutine[Any, Any, bool]] = _default_await_dependencies,
+        is_restart: bool = False,
         kwargs: Optional[Dict[str, Any]] = None
     ) -> None:
         self.name = name
@@ -136,6 +138,7 @@ class Executor:
         self.await_dependencies = await_dependencies
         self._state = ExecutionState.INIT
         self.proc: Optional[Process] = None
+        self.is_restart = is_restart
 
     @property
     def state(self) -> ExecutionState:
@@ -200,7 +203,14 @@ class Executor:
                     attempts += 1
                     self.proc = Process(
                         target=exec_task_lifecycle,
-                        args=(self.name, self.get_task_instance(), self.log_event_bus, result, self.shared_dict),
+                        args=(
+                            self.name,
+                            self.get_task_instance(),
+                            self.log_event_bus,
+                            result,
+                            self.shared_dict,
+                            self.is_restart
+                        ),
                         daemon=False
                     )
                     self.proc.start()

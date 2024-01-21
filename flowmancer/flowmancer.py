@@ -12,7 +12,9 @@ from argparse import ArgumentParser
 from collections import namedtuple
 from multiprocessing import Manager
 from multiprocessing.managers import DictProxy
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union, cast
+
+from pydantic import BaseModel
 
 from .checkpoint import CheckpointContents, NoCheckpointAvailableError
 from .checkpoint.file import FileCheckpoint
@@ -22,7 +24,14 @@ from .eventbus.log import SerializableLogEvent
 from .executor import ExecutionStateMap, Executor
 from .extensions.extension import Extension, _extension_classes
 from .extensions.progressbar import RichProgressBar
-from .jobdefinition import JobDefinition, TaskDefinition, _job_definition_classes
+from .jobdefinition import (
+    Configuration,
+    ExtensionDefinition,
+    JobDefinition,
+    LoggerDefinition,
+    TaskDefinition,
+    _job_definition_classes,
+)
 from .loggers.file import FileLogger
 from .loggers.logger import Logger, _logger_classes
 from .task import Task
@@ -46,23 +55,22 @@ def _create_loop():
     loop.close()
 
 
-def _load_extensions(path: str, add_to_path: bool = True, package_chain: List[str] = []):
+def _load_extensions_path(path: str, add_to_path: bool = True, package_chain: List[str] = []):
     if not path.startswith('/'):
         path = os.path.join(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])), path)
     if add_to_path:
         sys.path.append(path)
     for x in pkgutil.iter_modules(path=[path]):
         if x.ispkg:
-            _load_extensions(os.path.join(path, x.name), False, package_chain+[x.name])
+            _load_extensions_path(os.path.join(path, x.name), False, package_chain+[x.name])
         else:
             importlib.import_module('.'.join(package_chain+[x.name]))
 
 
 class Flowmancer:
-    def __init__(self, name: str = 'flowmancer', test: bool = False, debug: bool = False) -> None:
+    def __init__(self, *, test: bool = False, debug: bool = False) -> None:
         manager = Manager()
-        self._name = name
-        self.concurrency = 0
+        self._config: Configuration = Configuration()
         self._test = test
         self._debug = debug
         self._log_event_bus = EventBus[SerializableLogEvent](manager.Queue())
@@ -70,19 +78,10 @@ class Flowmancer:
         self._shared_dict: DictProxy[str, Any] = manager.dict()
         self._executors: Dict[str, ExecutorDetails] = dict()
         self._states = ExecutionStateMap()
+        self._registered_extensions: Dict[str, Extension] = {'progress-bar': RichProgressBar()}
+        self._registered_loggers: Dict[str, Logger] = {'file-logger': FileLogger()}
+        self._checkpoint_interval_seconds = 10
         self._tick_interval_seconds = 0.25
-        self._registered_extensions: List[Extension] = [RichProgressBar()]
-        self._registered_loggers: List[Logger] = [FileLogger()]
-        self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, v: str) -> None:
-        self._name = v
-        self._checkpoint.checkpoint_name = v
 
     def start(self) -> int:
         orig_cwd = os.getcwd()
@@ -103,8 +102,8 @@ class Flowmancer:
     async def _initiate(self) -> int:
         with _create_loop():
             root_event = asyncio.Event()
-            if self.concurrency > 0:
-                semaphore = asyncio.Semaphore(self.concurrency)
+            if self._config.max_concurrency > 0:
+                semaphore = asyncio.Semaphore(self._config.max_concurrency)
                 for i in self._executors.values():
                     i.instance.semaphore = semaphore
             observer_tasks = self._init_extensions(root_event)
@@ -122,16 +121,20 @@ class Flowmancer:
         parser.add_argument('--skip', action='append', dest='skip', default=[])
         parser.add_argument('--run-to', action='store', dest='run_to')
         parser.add_argument('--run-from', action='store', dest='run_from')
-        parser.add_argument('--max-parallel', action='store', type=int, dest='max_parallel')
+        parser.add_argument('--max-concurrency', action='store', type=int, dest='max_concurrency')
 
         args = parser.parse_args()
         self._debug = args.debug
 
+        if args.jobdef:
+            self.load_job_definition(args.jobdef)
+
         if args.restart:
             try:
-                cp = self._checkpoint.read_checkpoint()
-                self.load_job_definition(cp.job_definition)
+                cp = FileCheckpoint(checkpoint_name=self._config.name).read_checkpoint()
                 self._shared_dict.update(cp.shared_dict)
+                for i in self._executors.values():
+                    i.instance.is_restart = True
                 completed = cp.states[ExecutionState.COMPLETED].copy()
                 cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.FAILED])
                 cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.ABORTED])
@@ -146,26 +149,28 @@ class Flowmancer:
                 cp.states[ExecutionState.DEFAULTED].clear()
                 cp.states[ExecutionState.COMPLETED].clear()
                 self._states = cp.states
+                # Even though completed and don't require to be executed again, these tasks still need to trigger
+                # state change from INIT -> COMPLETED for components watching the Execution Event Bus.
                 for n in completed:
                     self._executors[n].instance.state = ExecutionState.COMPLETED
             except NoCheckpointAvailableError:
-                print(f"No checkpoint file found for '{self.name}'. Starting new job.")
-        elif args.jobdef:
-            self.load_job_definition(args.jobdef)
+                print(f"No checkpoint file found for '{self._config.name}'. Starting new job.")
+
+        # These override settings from JobsDefinition, if also defined there.
+        if args.max_concurrency is not None:
+            self._config.max_concurrency = args.max_concurrency
 
     # ASYNC INITIALIZATIONS
     def _init_checkpointer(self, root_event) -> asyncio.Task:
-        job_definition = self.get_job_definition()
-
         async def _write_checkpoint() -> None:
+            checkpoint = FileCheckpoint(checkpoint_name=self._config.name)
             last_write = 0
             while True:
-                if (time.time() - last_write) >= 10:
-                    self._checkpoint.write_checkpoint(
+                if (time.time() - last_write) >= self._checkpoint_interval_seconds:
+                    checkpoint.write_checkpoint(
                         CheckpointContents(
-                            name=self.name,
+                            name=self._config.name,
                             states=self._states,
-                            job_definition=job_definition,
                             shared_dict=self._shared_dict.copy()
                         )
                     )
@@ -175,7 +180,7 @@ class Flowmancer:
                         and not self._states[ExecutionState.DEFAULTED]
                         and not self._states[ExecutionState.ABORTED]
                     ):
-                        self._checkpoint.clear_checkpoint()
+                        checkpoint.clear_checkpoint()
                     break
                 else:
                     await asyncio.sleep(self._tick_interval_seconds)
@@ -202,20 +207,20 @@ class Flowmancer:
 
     def _init_loggers(self, root_event: asyncio.Event) -> List[asyncio.Task]:
         if self._test:
-            self._registered_loggers = []
+            self._registered_loggers = dict()
 
         async def _pusher() -> None:
-            for log in self._registered_loggers:
+            for log in self._registered_loggers.values():
                 await log.on_create()
             while True:
                 while not self._log_event_bus.empty():
                     m = self._log_event_bus.get()
-                    for log in self._registered_loggers:
+                    for log in self._registered_loggers.values():
                         # TODO: schedule the update as a task instead of awaiting
                         await log.update(m)
                 if root_event.is_set():
                     is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
-                    for log in self._registered_loggers:
+                    for log in self._registered_loggers.values():
                         if is_failed:
                             await log.on_failure()
                         else:
@@ -228,10 +233,10 @@ class Flowmancer:
 
     def _init_extensions(self, root_event: asyncio.Event) -> List[asyncio.Task]:
         if self._test:
-            self._registered_extensions = []
+            self._registered_extensions = dict()
 
         async def _pusher() -> None:
-            for obs in self._registered_extensions:
+            for obs in self._registered_extensions.values():
                 await obs.on_create()
             while True:
                 while not self._execution_event_bus.empty():
@@ -241,11 +246,11 @@ class Flowmancer:
                     if isinstance(e, ExecutionStateTransition):
                         self._states[e.to_state].add(e.name)
                         self._states[e.from_state].remove(e.name)
-                    for obs in self._registered_extensions:
+                    for obs in self._registered_extensions.values():
                         await obs.update(e)
                 if root_event.is_set():
                     is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
-                    for obs in self._registered_extensions:
+                    for obs in self._registered_extensions.values():
                         if is_failed:
                             await obs.on_failure()
                         else:
@@ -305,14 +310,13 @@ class Flowmancer:
             jobdef = _job_definition_classes[filetype]().load(j)
 
         # Configurations
-        self.name = jobdef.config.name
-        self.concurrency = jobdef.config.concurrency
+        self._config = jobdef.config
 
         # Recursively import any modules found in the following paths in order to trigger the registration of any
         # decorated classes.
         search_paths = ['./tasks', './extensions', './loggers'] + jobdef.config.extension_directories
         for p in search_paths:
-            _load_extensions(p)
+            _load_extensions_path(p)
 
         # Tasks
         for n, t in jobdef.tasks.items():
@@ -325,26 +329,36 @@ class Flowmancer:
             )
 
         # Observers
-        for _, o in jobdef.extensions.items():
-            self._registered_extensions.append(
-                _extension_classes[o.extension](**o.kwargs)
-            )
+        for n, e in jobdef.extensions.items():
+            self._registered_extensions[n] = _extension_classes[e.extension](**e.kwargs)
 
         # Loggers
-        for _, l in jobdef.loggers.items():
-            self._registered_loggers.append(
-                _logger_classes[l.logger](**l.kwargs)
-            )
+        for n, l in jobdef.loggers.items():
+            self._registered_loggers[n] = _logger_classes[l.logger](**l.kwargs)
 
         return self
 
     def get_job_definition(self) -> JobDefinition:
         j = JobDefinition(tasks=dict())
+        j.config = self._config
+
         for n, e in self._executors.items():
-            j.tasks[n] = (
-                TaskDefinition(
-                    task=type(e.instance.get_task_instance()).__name__,
-                    dependencies=[]
-                )
+            j.tasks[n] = TaskDefinition(
+                task=type(e.instance.get_task_instance()).__name__,
+                dependencies=[],
+                kwargs=e.instance.get_task_instance().dict()
             )
+
+        for n, e in self._registered_extensions.items():
+            j.extensions[n] = ExtensionDefinition(
+                extension=type(e).__name__,
+                kwargs=cast(BaseModel, e).dict()
+            )
+
+        for n, l in self._registered_loggers.items():
+            j.loggers[n] = LoggerDefinition(
+                logger=type(l).__name__,
+                kwargs=cast(BaseModel, l).dict()
+            )
+
         return j
