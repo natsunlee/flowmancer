@@ -2,11 +2,11 @@ import json
 
 import requests
 
-from ..plugin import plugin
+from ..extension import extension
 from .notification import Notification
 
 
-@plugin
+@extension
 class SlackWebhookNotification(Notification):
     webhook: str
 

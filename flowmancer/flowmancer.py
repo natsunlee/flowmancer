@@ -20,11 +20,11 @@ from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import SerializableLogEvent
 from .executor import ExecutionStateMap, Executor
+from .extensions.extension import Extension, _extension_classes
+from .extensions.progressbar import RichProgressBar
 from .jobdefinition import JobDefinition, TaskDefinition, _job_definition_classes
 from .loggers.file import FileLogger
 from .loggers.logger import Logger, _logger_classes
-from .plugins.plugin import Plugin, _plugin_classes
-from .plugins.progressbar import RichProgressBar
 from .task import Task
 
 __all__ = ['Flowmancer']
@@ -71,7 +71,7 @@ class Flowmancer:
         self._executors: Dict[str, ExecutorDetails] = dict()
         self._states = ExecutionStateMap()
         self._tick_interval_seconds = 0.25
-        self._registered_plugins: List[Plugin] = [RichProgressBar()]
+        self._registered_extensions: List[Extension] = [RichProgressBar()]
         self._registered_loggers: List[Logger] = [FileLogger()]
         self._semaphore: Optional[asyncio.Semaphore] = None
         self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
@@ -113,7 +113,7 @@ class Flowmancer:
     async def _initiate(self) -> int:
         with _create_loop():
             root_event = asyncio.Event()
-            observer_tasks = self._init_plugins(root_event)
+            observer_tasks = self._init_extensions(root_event)
             executor_tasks = self._init_executors(root_event)
             logger_tasks = self._init_loggers(root_event)
             checkpoint_task = self._init_checkpointer(root_event)
@@ -232,12 +232,12 @@ class Flowmancer:
 
         return [asyncio.create_task(_pusher())]
 
-    def _init_plugins(self, root_event: asyncio.Event) -> List[asyncio.Task]:
+    def _init_extensions(self, root_event: asyncio.Event) -> List[asyncio.Task]:
         if self._test:
-            self._registered_plugins = []
+            self._registered_extensions = []
 
         async def _pusher() -> None:
-            for obs in self._registered_plugins:
+            for obs in self._registered_extensions:
                 await obs.on_create()
             while True:
                 while not self._execution_event_bus.empty():
@@ -247,11 +247,11 @@ class Flowmancer:
                     if isinstance(e, ExecutionStateTransition):
                         self._states[e.to_state].add(e.name)
                         self._states[e.from_state].remove(e.name)
-                    for obs in self._registered_plugins:
+                    for obs in self._registered_extensions:
                         await obs.update(e)
                 if root_event.is_set():
                     is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
-                    for obs in self._registered_plugins:
+                    for obs in self._registered_extensions:
                         if is_failed:
                             await obs.on_failure()
                         else:
@@ -317,7 +317,7 @@ class Flowmancer:
 
         # Recursively import any modules found in the following paths in order to trigger the registration of any
         # decorated classes.
-        search_paths = ['./tasks', './plugins', './extensions'] + jobdef.config.extension_directories
+        search_paths = ['./tasks', './extensions', './loggers'] + jobdef.config.extension_directories
         for p in search_paths:
             _load_extensions(p)
 
@@ -332,9 +332,9 @@ class Flowmancer:
             )
 
         # Observers
-        for _, o in jobdef.plugins.items():
-            self._registered_plugins.append(
-                _plugin_classes[o.plugin](**o.kwargs)
+        for _, o in jobdef.extensions.items():
+            self._registered_extensions.append(
+                _extension_classes[o.extension](**o.kwargs)
             )
 
         # Loggers

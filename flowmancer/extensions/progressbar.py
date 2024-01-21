@@ -6,7 +6,7 @@ from typing import Dict
 from rich.progress import Progress, TaskID
 
 from ..executor import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
-from .plugin import Plugin, plugin
+from .extension import Extension, extension
 
 
 class RichProgressBarState:
@@ -19,8 +19,8 @@ class RichProgressBarState:
         self.update_task: asyncio.Task
 
 
-@plugin
-class RichProgressBar(Plugin):
+@extension
+class RichProgressBar(Extension):
     _state: RichProgressBarState = RichProgressBarState()
 
     def _update_pbar(self, advance: int = 0) -> None:

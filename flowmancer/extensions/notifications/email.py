@@ -1,11 +1,11 @@
 import smtplib
 from email.message import EmailMessage
 
-from ..plugin import plugin
+from ..extension import extension
 from .notification import Notification
 
 
-@plugin
+@extension
 class EmailNotification(Notification):
     recipient: str
     smtp_host: str

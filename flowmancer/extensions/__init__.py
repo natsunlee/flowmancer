@@ -1,6 +1,6 @@
 # noqa: F401
 # Ensure implementations are registered
 from . import notifications, progressbar
-from .plugin import Plugin, plugin
+from .extension import Extension, extension
 
-__all__ = ['Plugin', 'plugin']
+__all__ = ['Extension', 'extension']

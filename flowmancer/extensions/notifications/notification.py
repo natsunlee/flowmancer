@@ -2,10 +2,10 @@ from abc import abstractmethod
 from datetime import datetime
 
 from ...executor import SerializableExecutionEvent
-from ..plugin import Plugin
+from ..extension import Extension
 
 
-class Notification(Plugin):
+class Notification(Extension):
     async def update(self, _: SerializableExecutionEvent) -> None:
         # We don't want notifications to be spammed...
         pass

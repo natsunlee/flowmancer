@@ -1,10 +1,10 @@
 import requests
 
-from ..plugin import plugin
+from ..extension import extension
 from .notification import Notification
 
 
-@plugin
+@extension
 class PushoverNotification(Notification):
     app_token: str
     user_key: str
