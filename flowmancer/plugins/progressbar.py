@@ -21,17 +21,17 @@ class RichProgressBarState:
 
 @plugin
 class RichProgressBar(Plugin):
-    _internal: RichProgressBarState = RichProgressBarState()
+    _state: RichProgressBarState = RichProgressBarState()
 
     def _update_pbar(self, advance: int = 0) -> None:
-        pending = self._internal.state_counts[ExecutionState.PENDING]
-        running = self._internal.state_counts[ExecutionState.RUNNING]
+        pending = self._state.state_counts[ExecutionState.PENDING]
+        running = self._state.state_counts[ExecutionState.RUNNING]
         failed = (
-            self._internal.state_counts[ExecutionState.FAILED] + self._internal.state_counts[ExecutionState.DEFAULTED]
+            self._state.state_counts[ExecutionState.FAILED] + self._state.state_counts[ExecutionState.DEFAULTED]
         )
-        completed = self._internal.state_counts[ExecutionState.COMPLETED]
+        completed = self._state.state_counts[ExecutionState.COMPLETED]
         total = (pending + running + failed + completed) or 100
-        elapsed = int(time.time() - self._internal.start_time)
+        elapsed = int(time.time() - self._state.start_time)
         m = (
             f'Pending: {pending} - '
             + f'Running: {running} - '
@@ -39,38 +39,38 @@ class RichProgressBar(Plugin):
             + f'Failed: {failed} '
             + f'(Elapsed: {elapsed} sec.)'
         )
-        self._internal.progress.update(self._internal.task, description=m, advance=advance, total=total)
+        self._state.progress.update(self._state.task, description=m, advance=advance, total=total)
 
     async def _continuous_update_pbar(self) -> None:
         while True:
             self._update_pbar()
-            if self._internal.event.is_set():
+            if self._state.event.is_set():
                 # Need to imitate do-while to ensure pbar is updated one final time
                 # before exiting loop due to Event set.
                 break
             await asyncio.sleep(0.5)
 
     async def on_create(self) -> None:
-        self._internal.state_counts = defaultdict(lambda: 0)
-        self._internal.start_time = time.time()
-        self._internal.progress = Progress()
-        self._internal.event = asyncio.Event()
-        self._internal.task = self._internal.progress.add_task('Pending: 0 - Running: 0 - Completed: 0 - Failed: 0')
-        self._internal.progress.start()
+        self._state.state_counts = defaultdict(lambda: 0)
+        self._state.start_time = time.time()
+        self._state.progress = Progress()
+        self._state.event = asyncio.Event()
+        self._state.task = self._state.progress.add_task('Pending: 0 - Running: 0 - Completed: 0 - Failed: 0')
+        self._state.progress.start()
 
         loop = asyncio.get_event_loop()
-        self._internal.update_task = loop.create_task(self._continuous_update_pbar())
+        self._state.update_task = loop.create_task(self._continuous_update_pbar())
 
     async def on_destroy(self) -> None:
-        self._internal.event.set()
-        await asyncio.gather(self._internal.update_task)
-        self._internal.progress.stop()
+        self._state.event.set()
+        await asyncio.gather(self._state.update_task)
+        self._state.progress.stop()
 
     async def update(self, e: SerializableExecutionEvent) -> None:
         if isinstance(e, ExecutionStateTransition):
             from_state = ExecutionState(e.from_state)
             to_state = ExecutionState(e.to_state)
-            self._internal.state_counts[from_state] -= 1
-            self._internal.state_counts[to_state] += 1
+            self._state.state_counts[from_state] -= 1
+            self._state.state_counts[to_state] += 1
             if to_state in (ExecutionState.FAILED, ExecutionState.COMPLETED, ExecutionState.DEFAULTED):
                 self._update_pbar(1)

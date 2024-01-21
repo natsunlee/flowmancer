@@ -7,15 +7,18 @@ from .checkpoint import Checkpoint, CheckpointContents, NoCheckpointAvailableErr
 
 @checkpoint
 class FileCheckpoint(Checkpoint):
-    def __init__(self, checkpoint_name: str, checkpoint_dir: str = './.flowmancer') -> None:
-        self.checkpoint_name = checkpoint_name
-        self.checkpoint_dir = Path(checkpoint_dir)
-        self.checkpoint_file_path = self.checkpoint_dir / self.checkpoint_name
+    checkpoint_name: str
+    checkpoint_dir: str = './.flowmancer'
+
+    @property
+    def checkpoint_file_path(self) -> Path:
+        return Path(self.checkpoint_dir) / self.checkpoint_name
 
     def write_checkpoint(self, content: CheckpointContents) -> None:
-        if not os.path.exists(self.checkpoint_dir):
-            os.makedirs(self.checkpoint_dir, exist_ok=True)
-        tmp = self.checkpoint_dir / (self.checkpoint_name + '.tmp')
+        cdir = Path(self.checkpoint_dir)
+        if not os.path.exists(cdir):
+            os.makedirs(cdir, exist_ok=True)
+        tmp = cdir / (self.checkpoint_name + '.tmp')
         perm = self.checkpoint_file_path
         with open(tmp, 'wb') as f:
             pickle.dump(content, f)

@@ -61,7 +61,7 @@ def _load_extensions(path: str, add_to_path: bool = True, package_chain: List[st
 class Flowmancer:
     def __init__(self, name: str = 'flowmancer', test: bool = False, debug: bool = False) -> None:
         manager = Manager()
-        self.name = name
+        self._name = name
         self._concurrency = 0
         self._test = test
         self._debug = debug
@@ -75,6 +75,15 @@ class Flowmancer:
         self._registered_loggers: List[Logger] = [FileLogger()]
         self._semaphore: Optional[asyncio.Semaphore] = None
         self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, v: str) -> None:
+        self._name = v
+        self._checkpoint.checkpoint_name = v
 
     @property
     def concurrency(self) -> int:

@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+from pydantic import BaseModel, Extra
+
 from ..eventbus.log import SerializableLogEvent
 from ..lifecycle import AsyncLifecycle
 
@@ -16,7 +18,11 @@ def logger(t: type[Logger]) -> Any:
     return t
 
 
-class Logger(ABC, AsyncLifecycle):
+class Logger(ABC, AsyncLifecycle, BaseModel):
+    class Config:
+        extra = Extra.forbid
+        underscore_attrs_are_private = True
+
     @abstractmethod
     async def update(self, m: SerializableLogEvent) -> None:
         pass
