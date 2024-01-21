@@ -1,3 +1,3 @@
-from . import checkpoint, loggers, plugins
+from . import checkpoint, extensions, loggers
 from .flowmancer import Flowmancer
 from .jobdefinition import file
