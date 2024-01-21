@@ -62,7 +62,7 @@ class Flowmancer:
     def __init__(self, name: str = 'flowmancer', test: bool = False, debug: bool = False) -> None:
         manager = Manager()
         self._name = name
-        self._concurrency = 0
+        self.concurrency = 0
         self._test = test
         self._debug = debug
         self._log_event_bus = EventBus[SerializableLogEvent](manager.Queue())
@@ -73,7 +73,6 @@ class Flowmancer:
         self._tick_interval_seconds = 0.25
         self._registered_extensions: List[Extension] = [RichProgressBar()]
         self._registered_loggers: List[Logger] = [FileLogger()]
-        self._semaphore: Optional[asyncio.Semaphore] = None
         self._checkpoint = FileCheckpoint(checkpoint_name=self.name)
 
     @property
@@ -84,15 +83,6 @@ class Flowmancer:
     def name(self, v: str) -> None:
         self._name = v
         self._checkpoint.checkpoint_name = v
-
-    @property
-    def concurrency(self) -> int:
-        return self._concurrency
-
-    @concurrency.setter
-    def concurrency(self, v: int) -> None:
-        self._concurrency = v
-        self._semaphore = asyncio.Semaphore(v) if v > 0 else None
 
     def start(self) -> int:
         orig_cwd = os.getcwd()
@@ -113,6 +103,10 @@ class Flowmancer:
     async def _initiate(self) -> int:
         with _create_loop():
             root_event = asyncio.Event()
+            if self.concurrency > 0:
+                semaphore = asyncio.Semaphore(self.concurrency)
+                for i in self._executors.values():
+                    i.instance.semaphore = semaphore
             observer_tasks = self._init_extensions(root_event)
             executor_tasks = self._init_executors(root_event)
             logger_tasks = self._init_loggers(root_event)
@@ -297,7 +291,6 @@ class Flowmancer:
             execution_event_bus=self._execution_event_bus,
             shared_dict=self._shared_dict,
             await_dependencies=await_dependencies,
-            semaphore=self._semaphore,
             max_attempts=max_attempts,
             backoff=backoff
         )

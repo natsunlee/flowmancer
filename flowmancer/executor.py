@@ -135,6 +135,7 @@ class Executor:
         self.kwargs = kwargs
         self.await_dependencies = await_dependencies
         self._state = ExecutionState.INIT
+        self.proc: Optional[Process] = None
 
     @property
     def state(self) -> ExecutionState:
