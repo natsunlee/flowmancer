@@ -104,6 +104,7 @@ tasks:
   # Only run if prior 2 tasks complete successfully
   final-fail-task:
     task: FailImmediately
+    max_attempts: 3  # Retry uup to 2 times upon failure (1 initial exec + 2 retries = 3 attempts)
     dependencies:
       - succeed-task-a
       - succeed-task-b
