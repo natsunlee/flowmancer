@@ -61,9 +61,9 @@ def _load_extensions_path(path: str, add_to_path: bool = True, package_chain: Li
     if add_to_path:
         sys.path.append(path)
     for x in pkgutil.iter_modules(path=[path]):
-        _load_extensions_path(os.path.join(path, x.name), False, package_chain+[x.name])
+        importlib.import_module('.'.join(package_chain+[x.name]))
         if x.ispkg:
-            importlib.import_module('.'.join(package_chain+[x.name]))
+            _load_extensions_path(os.path.join(path, x.name), False, package_chain+[x.name])
 
 
 class Flowmancer:
