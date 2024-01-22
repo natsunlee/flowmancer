@@ -27,6 +27,7 @@ class Task(ABC, BaseModel, Lifecycle):
     class Config:
         extra = Extra.forbid
         underscore_attrs_are_private = True
+        use_enum_values = True
 
     @abstractmethod
     def run(self) -> None:

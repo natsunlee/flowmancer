@@ -6,7 +6,7 @@ from collections import defaultdict
 from queue import Queue
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Extra
 
 _event_classes: Dict[str, Dict[str, Type[SerializableEvent]]] = defaultdict(dict)
 
@@ -21,6 +21,8 @@ class NotADeserializableEventError(Exception):
 
 class SerializableEvent(BaseModel, ABC):
     class Config:
+        extra = Extra.forbid
+        underscore_attrs_are_private = True
         use_enum_values = True
 
     @classmethod

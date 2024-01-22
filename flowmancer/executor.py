@@ -100,12 +100,11 @@ def exec_task_lifecycle(
         else:
             _exec_lifecycle_stage(task_instance.on_success)
             result.is_failed = False
-
-        _exec_lifecycle_stage(task_instance.on_destroy)
     except Exception:
         print(traceback.format_exc())
         result.is_failed = True
     finally:
+        _exec_lifecycle_stage(task_instance.on_destroy)
         writer.close()
         sys.stdout = _sout
         sys.stderr = _serr
@@ -124,7 +123,7 @@ class Executor:
         backoff: int = 0,
         await_dependencies: Callable[[], Coroutine[Any, Any, bool]] = _default_await_dependencies,
         is_restart: bool = False,
-        kwargs: Optional[Dict[str, Any]] = None
+        parameters: Optional[Dict[str, Any]] = None
     ) -> None:
         self.name = name
         self.log_event_bus = log_event_bus
@@ -134,7 +133,7 @@ class Executor:
         self.semaphore = semaphore
         self.backoff = backoff
         self.task_class = task_class
-        self.kwargs = kwargs
+        self.parameters = parameters
         self.await_dependencies = await_dependencies
         self._state = ExecutionState.INIT
         self.proc: Optional[Process] = None
@@ -152,11 +151,11 @@ class Executor:
         self._state = val
 
     def get_task_instance(self) -> Task:
-        kwargs = self.kwargs or dict()
+        parameters = self.parameters or dict()
         if inspect.isclass(self.task_class) and issubclass(self.task_class, Task):
-            return self.task_class(**kwargs)
+            return self.task_class(**parameters)
         elif type(self.task_class) == str:
-            return _task_classes[self.task_class](**kwargs)
+            return _task_classes[self.task_class](**parameters)
         else:
             raise TypeError('The `task_class` param must be either an extension of `Task` or the string name of one.')
 

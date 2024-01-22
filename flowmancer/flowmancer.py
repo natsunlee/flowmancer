@@ -61,9 +61,8 @@ def _load_extensions_path(path: str, add_to_path: bool = True, package_chain: Li
     if add_to_path:
         sys.path.append(path)
     for x in pkgutil.iter_modules(path=[path]):
+        _load_extensions_path(os.path.join(path, x.name), False, package_chain+[x.name])
         if x.ispkg:
-            _load_extensions_path(os.path.join(path, x.name), False, package_chain+[x.name])
-        else:
             importlib.import_module('.'.join(package_chain+[x.name]))
 
 
@@ -133,8 +132,8 @@ class Flowmancer:
             try:
                 cp = FileCheckpoint(checkpoint_name=self._config.name).read_checkpoint()
                 self._shared_dict.update(cp.shared_dict)
-                for i in self._executors.values():
-                    i.instance.is_restart = True
+                for name in cp.states[ExecutionState.FAILED]:
+                    self._executors[name].instance.is_restart = True
                 completed = cp.states[ExecutionState.COMPLETED].copy()
                 cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.FAILED])
                 cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.ABORTED])
@@ -279,7 +278,8 @@ class Flowmancer:
         task_class: Union[str, Type[Task]],
         deps: Optional[List[str]] = None,
         max_attempts: int = 1,
-        backoff: int = 0
+        backoff: int = 0,
+        parameters: Dict[str, Any] = dict()
     ) -> None:
         async def await_dependencies() -> bool:
             for dep_name in self._executors[name].dependencies:
@@ -297,7 +297,8 @@ class Flowmancer:
             shared_dict=self._shared_dict,
             await_dependencies=await_dependencies,
             max_attempts=max_attempts,
-            backoff=backoff
+            backoff=backoff,
+            parameters=parameters
         )
 
         self._executors[name] = ExecutorDetails(instance=e, dependencies=(deps or []))
@@ -318,6 +319,9 @@ class Flowmancer:
         for p in search_paths:
             _load_extensions_path(p)
 
+        for p in jobdef.config.extension_packages:
+            importlib.import_module(p)
+
         # Tasks
         for n, t in jobdef.tasks.items():
             self.add_executor(
@@ -325,16 +329,17 @@ class Flowmancer:
                 task_class=t.task,
                 deps=t.dependencies,
                 max_attempts=t.max_attempts,
-                backoff=t.backoff
+                backoff=t.backoff,
+                parameters=t.parameters
             )
 
         # Observers
         for n, e in jobdef.extensions.items():
-            self._registered_extensions[n] = _extension_classes[e.extension](**e.kwargs)
+            self._registered_extensions[n] = _extension_classes[e.extension](**e.parameters)
 
         # Loggers
         for n, l in jobdef.loggers.items():
-            self._registered_loggers[n] = _logger_classes[l.logger](**l.kwargs)
+            self._registered_loggers[n] = _logger_classes[l.logger](**l.parameters)
 
         return self
 
@@ -346,19 +351,19 @@ class Flowmancer:
             j.tasks[n] = TaskDefinition(
                 task=type(e.instance.get_task_instance()).__name__,
                 dependencies=[],
-                kwargs=e.instance.get_task_instance().dict()
+                parameters=e.instance.get_task_instance().dict()
             )
 
         for n, e in self._registered_extensions.items():
             j.extensions[n] = ExtensionDefinition(
                 extension=type(e).__name__,
-                kwargs=cast(BaseModel, e).dict()
+                parameters=cast(BaseModel, e).dict()
             )
 
         for n, l in self._registered_loggers.items():
             j.loggers[n] = LoggerDefinition(
                 logger=type(l).__name__,
-                kwargs=cast(BaseModel, l).dict()
+                parameters=cast(BaseModel, l).dict()
             )
 
         return j

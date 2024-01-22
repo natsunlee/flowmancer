@@ -21,11 +21,12 @@ class JobDefinitionComponent(BaseModel):
     class Config:
         extra = Extra.forbid
         underscore_attrs_are_private = True
+        use_enum_values = True
 
 
 class LoggerDefinition(JobDefinitionComponent):
     logger: str
-    kwargs: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Union[int, str]] = dict()
 
 
 class TaskDefinition(JobDefinitionComponent):
@@ -33,12 +34,12 @@ class TaskDefinition(JobDefinitionComponent):
     dependencies: List[str] = []
     max_attempts: int = 1
     backoff: int = 0
-    kwargs: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Union[int, str]] = dict()
 
 
 class ExtensionDefinition(JobDefinitionComponent):
     extension: str
-    kwargs: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Union[int, str]] = dict()
 
 
 class Configuration(JobDefinitionComponent):
