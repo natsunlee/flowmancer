@@ -1,13 +1,11 @@
 from abc import abstractmethod
 from datetime import datetime
-from typing import Any, Dict
 
-from ...executor import (ExecutionState, ExecutionStateTransition,
-                         SerializableExecutionEvent)
-from .. import Observer
+from ...executor import SerializableExecutionEvent
+from ..extension import Extension
 
 
-class Notification(Observer):
+class Notification(Extension):
     async def update(self, _: SerializableExecutionEvent) -> None:
         # We don't want notifications to be spammed...
         pass

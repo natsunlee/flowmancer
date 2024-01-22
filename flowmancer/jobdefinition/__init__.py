@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Type, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Extra
 
 _job_definition_classes = dict()
 
@@ -17,29 +17,44 @@ def job_definition(key: str) -> Callable:
     return inner
 
 
-class LoggerDefinition(BaseModel):
+class JobDefinitionComponent(BaseModel):
+    class Config:
+        extra = Extra.forbid
+        underscore_attrs_are_private = True
+        use_enum_values = True
+
+
+class LoggerDefinition(JobDefinitionComponent):
     logger: str
-    kwargs: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Union[int, str]] = dict()
 
 
-class TaskDefinition(BaseModel):
+class TaskDefinition(JobDefinitionComponent):
     task: str
     dependencies: List[str] = []
     max_attempts: int = 1
     backoff: int = 0
-    kwargs: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Union[int, str]] = dict()
 
 
-class ObserverDefinition(BaseModel):
-    observer: str
-    kwargs: Dict[str, Union[int, str]] = dict()
+class ExtensionDefinition(JobDefinitionComponent):
+    extension: str
+    parameters: Dict[str, Union[int, str]] = dict()
 
 
-class JobDefinition(BaseModel):
-    concurrency: int = 0
+class Configuration(JobDefinitionComponent):
+    name: str = 'flowmancer'
+    max_concurrency: int = 0
+    extension_directories: List[str] = []
+    extension_packages: List[str] = []
+
+
+class JobDefinition(JobDefinitionComponent):
+    version: float = 0.1
+    config: Configuration = Configuration()
     tasks: Dict[str, TaskDefinition]
     loggers: Dict[str, LoggerDefinition] = dict()
-    observers: Dict[str, ObserverDefinition] = dict()
+    extensions: Dict[str, ExtensionDefinition] = dict()
 
 
 class SerializableJobDefinition(ABC):

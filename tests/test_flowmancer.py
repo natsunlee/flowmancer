@@ -2,8 +2,7 @@ import asyncio
 
 import pytest
 
-from flowmancer.eventbus.execution import (ExecutionState,
-                                           ExecutionStateTransition)
+from flowmancer.eventbus.execution import ExecutionState, ExecutionStateTransition
 from flowmancer.eventbus.log import LogWriteEvent, Severity
 from flowmancer.flowmancer import Flowmancer
 
@@ -104,7 +103,7 @@ async def test_log_pusher_ends_empty_queue():
 async def test_observer_pusher_ends_root_event():
     root_event = asyncio.Event()
     f = Flowmancer(test=True)
-    tasks = f._init_observers(root_event)
+    tasks = f._init_extensions(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
 
@@ -121,7 +120,7 @@ async def test_observer_pusher_ends_empty_queue(success_task_cls):
             to_state=ExecutionState.PENDING
         )
     )
-    tasks = f._init_observers(root_event)
+    tasks = f._init_extensions(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
 
@@ -139,7 +138,7 @@ async def test_all_pusher_ends_empty_queue(success_task_cls):
             to_state=ExecutionState.PENDING
         )
     )
-    tasks = f._init_observers(root_event) + f._init_loggers(root_event)
+    tasks = f._init_extensions(root_event) + f._init_loggers(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
 
