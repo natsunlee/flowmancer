@@ -53,8 +53,8 @@ class JobDefinition(JobDefinitionComponent):
     version: float = 0.1
     config: Configuration = Configuration()
     tasks: Dict[str, TaskDefinition]
-    loggers: Dict[str, LoggerDefinition] = dict()
-    extensions: Dict[str, ExtensionDefinition] = dict()
+    loggers: Dict[str, LoggerDefinition] = {'file-logger': LoggerDefinition(logger='FileLogger')}
+    extensions: Dict[str, ExtensionDefinition] = {'progress-bar': ExtensionDefinition(extension='RichProgressBar')}
 
 
 class SerializableJobDefinition(ABC):

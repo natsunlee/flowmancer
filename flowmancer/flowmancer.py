@@ -23,7 +23,6 @@ from .eventbus.execution import ExecutionState, ExecutionStateTransition, Serial
 from .eventbus.log import SerializableLogEvent
 from .executor import ExecutionStateMap, Executor
 from .extensions.extension import Extension, _extension_classes
-from .extensions.progressbar import RichProgressBar
 from .jobdefinition import (
     Configuration,
     ExtensionDefinition,
@@ -32,7 +31,6 @@ from .jobdefinition import (
     TaskDefinition,
     _job_definition_classes,
 )
-from .loggers.file import FileLogger
 from .loggers.logger import Logger, _logger_classes
 from .task import Task
 
@@ -77,8 +75,8 @@ class Flowmancer:
         self._shared_dict: DictProxy[str, Any] = manager.dict()
         self._executors: Dict[str, ExecutorDetails] = dict()
         self._states = ExecutionStateMap()
-        self._registered_extensions: Dict[str, Extension] = {'progress-bar': RichProgressBar()}
-        self._registered_loggers: Dict[str, Logger] = {'file-logger': FileLogger()}
+        self._registered_extensions: Dict[str, Extension] = dict()
+        self._registered_loggers: Dict[str, Logger] = dict()
         self._checkpoint_interval_seconds = 10
         self._tick_interval_seconds = 0.25
 
