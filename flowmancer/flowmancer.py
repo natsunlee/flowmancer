@@ -87,7 +87,9 @@ def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
             print(f"importing: {'.'.join(package_chain+[x.name])}")
             importlib.import_module('.'.join(package_chain+[x.name]))
         except Exception as e:
-            print(f"Skipping import for '{'.'.join(package_chain+[x.name])}' due to {type(e).__name__}: {str(e)}")
+            print(
+                f"WARNING: Skipping import for '{'.'.join(package_chain+[x.name])}' due to {type(e).__name__}: {str(e)}"
+            )
         if x.ispkg:
             _load_extensions_path(os.path.join(path, x.name), package_chain+[x.name])
 
