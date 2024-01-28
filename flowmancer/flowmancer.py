@@ -85,10 +85,11 @@ class Flowmancer:
     def start(self) -> int:
         orig_cwd = os.getcwd()
         try:
-            # Ensure any components, such as file loggers, work with respect to the caller's project dir.
+            # Ensure any components, such as file loggers, work with respect to the .py file in which the `start`
+            # command is invoked, which is usually the project root dir.
             os.chdir(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])))
             if not self._test:
-                self._process_cmd_args()
+                self._process_cmd_args(orig_cwd)
             if not self._executors:
                 raise NoTasksLoadedError(
                     'No Tasks have been loaded! Please check that you have provided a valid Job Definition file.'
@@ -112,7 +113,7 @@ class Flowmancer:
             await asyncio.gather(*observer_tasks, *executor_tasks, *logger_tasks, checkpoint_task)
         return len(self._states[ExecutionState.FAILED]) + len(self._states[ExecutionState.DEFAULTED])
 
-    def _process_cmd_args(self) -> None:
+    def _process_cmd_args(self, caller_cwd: str) -> None:
         parser = ArgumentParser(description='Flowmancer job execution options.')
         parser.add_argument('-j', '--jobdef', action='store', dest='jobdef')
         parser.add_argument('-r', '--restart', action='store_true', dest='restart', default=False)
@@ -126,7 +127,8 @@ class Flowmancer:
         self._debug = args.debug
 
         if args.jobdef:
-            self.load_job_definition(args.jobdef)
+            jobdef_path = args.jobdef if args.jobdef.startswith('/') else os.path.join(caller_cwd, args.jobdef)
+            self.load_job_definition(jobdef_path)
 
         if args.restart:
             try:
