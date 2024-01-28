@@ -16,8 +16,9 @@ from typing import Any, Dict, List, Optional, Type, Union, cast
 
 from pydantic import BaseModel
 
-from .checkpoint import CheckpointContents, NoCheckpointAvailableError
-from .checkpoint.file import FileCheckpoint
+from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailableError
+from .checkpointer.checkpointer import _checkpointer_classes
+from .checkpointer.file import FileCheckpointer
 from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import SerializableLogEvent
@@ -77,6 +78,7 @@ class Flowmancer:
         self._states = ExecutionStateMap()
         self._registered_extensions: Dict[str, Extension] = dict()
         self._registered_loggers: Dict[str, Logger] = dict()
+        self._checkpointer_instance: Checkpointer = FileCheckpointer()
         self._checkpoint_interval_seconds = 10
         self._tick_interval_seconds = 0.25
 
@@ -128,7 +130,7 @@ class Flowmancer:
 
         if args.restart:
             try:
-                cp = FileCheckpoint(checkpoint_name=self._config.name).read_checkpoint()
+                cp = self._checkpointer_instance.read_checkpoint(self._config.name)
                 self._shared_dict.update(cp.shared_dict)
                 for name in cp.states[ExecutionState.FAILED]:
                     self._executors[name].instance.is_restart = True
@@ -160,11 +162,12 @@ class Flowmancer:
     # ASYNC INITIALIZATIONS
     def _init_checkpointer(self, root_event) -> asyncio.Task:
         async def _write_checkpoint() -> None:
-            checkpoint = FileCheckpoint(checkpoint_name=self._config.name)
+            checkpointer = self._checkpointer_instance
             last_write = 0
             while True:
                 if (time.time() - last_write) >= self._checkpoint_interval_seconds:
-                    checkpoint.write_checkpoint(
+                    checkpointer.write_checkpoint(
+                        self._config.name,
                         CheckpointContents(
                             name=self._config.name,
                             states=self._states,
@@ -177,7 +180,7 @@ class Flowmancer:
                         and not self._states[ExecutionState.DEFAULTED]
                         and not self._states[ExecutionState.ABORTED]
                     ):
-                        checkpoint.clear_checkpoint()
+                        checkpointer.clear_checkpoint(self._config.name)
                     break
                 else:
                     await asyncio.sleep(self._tick_interval_seconds)
@@ -330,6 +333,11 @@ class Flowmancer:
                 backoff=t.backoff,
                 parameters=t.parameters
             )
+
+        # Checkpointer
+        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer_config.checkpointer](
+            **jobdef.checkpointer_config.parameters
+        )
 
         # Observers
         for n, e in jobdef.extensions.items():
