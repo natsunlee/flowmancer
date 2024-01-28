@@ -6,7 +6,6 @@ import importlib
 import inspect
 import os
 import pkgutil
-import sys
 import time
 from argparse import ArgumentParser
 from collections import namedtuple
@@ -44,6 +43,14 @@ class NoTasksLoadedError(Exception):
     pass
 
 
+class ExtensionsDirectoryNotFoundError(Exception):
+    pass
+
+
+class NotAPackageError(Exception):
+    pass
+
+
 # Need to explicitly manage loop in case multiple instances of Flowmancer are run.
 @contextlib.contextmanager
 def _create_loop():
@@ -54,15 +61,35 @@ def _create_loop():
     loop.close()
 
 
-def _load_extensions_path(path: str, add_to_path: bool = True, package_chain: List[str] = []):
+def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
     if not path.startswith('/'):
-        path = os.path.join(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])), path)
-    if add_to_path:
-        sys.path.append(path)
+        path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(
+                    os.path.abspath(inspect.stack()[-1][1])
+                ),
+                path
+            )
+        )
+
+    if not os.path.exists(path):
+        raise ExtensionsDirectoryNotFoundError(f"No such directory: '{path}'")
+    if os.path.isfile(path):
+        raise NotAPackageError(f"Only packages (directories) are allowed. The following is not a dir: '{path}'")
+    if not os.path.exists(os.path.join(path, '__init__.py')):
+        print(f"WARNING: The '{path}' dir is not a package (no __init__.py file found). Modules will not be imported.")
+
+    if not package_chain:
+        package_chain = [os.path.basename(path)]
+
     for x in pkgutil.iter_modules(path=[path]):
-        importlib.import_module('.'.join(package_chain+[x.name]))
+        try:
+            print(f"importing: {'.'.join(package_chain+[x.name])}")
+            importlib.import_module('.'.join(package_chain+[x.name]))
+        except Exception as e:
+            print(f"Skipping import for '{'.'.join(package_chain+[x.name])}' due to {type(e).__name__}: {str(e)}")
         if x.ispkg:
-            _load_extensions_path(os.path.join(path, x.name), False, package_chain+[x.name])
+            _load_extensions_path(os.path.join(path, x.name), package_chain+[x.name])
 
 
 class Flowmancer:
@@ -318,8 +345,15 @@ class Flowmancer:
 
         # Recursively import any modules found in the following paths in order to trigger the registration of any
         # decorated classes.
-        search_paths = ['./tasks', './extensions', './loggers'] + jobdef.config.extension_directories
-        for p in search_paths:
+        for p in ['./tasks', './extensions', './loggers']:
+            try:
+                _load_extensions_path(p)
+            except ExtensionsDirectoryNotFoundError:
+                # Don't error on the absence of dirs that are searched by default.
+                pass
+
+        # Allow for missing dir exceptions for passed-in paths.
+        for p in jobdef.config.extension_directories:
             _load_extensions_path(p)
 
         for p in jobdef.config.extension_packages:
