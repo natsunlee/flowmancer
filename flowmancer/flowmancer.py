@@ -6,7 +6,6 @@ import importlib
 import inspect
 import os
 import pkgutil
-import sys
 import time
 from argparse import ArgumentParser
 from collections import namedtuple
@@ -16,8 +15,9 @@ from typing import Any, Dict, List, Optional, Type, Union, cast
 
 from pydantic import BaseModel
 
-from .checkpoint import CheckpointContents, NoCheckpointAvailableError
-from .checkpoint.file import FileCheckpoint
+from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailableError
+from .checkpointer.checkpointer import _checkpointer_classes
+from .checkpointer.file import FileCheckpointer
 from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import SerializableLogEvent
@@ -43,6 +43,14 @@ class NoTasksLoadedError(Exception):
     pass
 
 
+class ExtensionsDirectoryNotFoundError(Exception):
+    pass
+
+
+class NotAPackageError(Exception):
+    pass
+
+
 # Need to explicitly manage loop in case multiple instances of Flowmancer are run.
 @contextlib.contextmanager
 def _create_loop():
@@ -53,15 +61,37 @@ def _create_loop():
     loop.close()
 
 
-def _load_extensions_path(path: str, add_to_path: bool = True, package_chain: List[str] = []):
+def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
     if not path.startswith('/'):
-        path = os.path.join(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])), path)
-    if add_to_path:
-        sys.path.append(path)
+        path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(
+                    os.path.abspath(inspect.stack()[-1][1])
+                ),
+                path
+            )
+        )
+
+    if not os.path.exists(path):
+        raise ExtensionsDirectoryNotFoundError(f"No such directory: '{path}'")
+    if os.path.isfile(path):
+        raise NotAPackageError(f"Only packages (directories) are allowed. The following is not a dir: '{path}'")
+    if not os.path.exists(os.path.join(path, '__init__.py')):
+        print(f"WARNING: The '{path}' dir is not a package (no __init__.py file found). Modules will not be imported.")
+
+    if not package_chain:
+        package_chain = [os.path.basename(path)]
+
     for x in pkgutil.iter_modules(path=[path]):
-        importlib.import_module('.'.join(package_chain+[x.name]))
+        try:
+            print(f"importing: {'.'.join(package_chain+[x.name])}")
+            importlib.import_module('.'.join(package_chain+[x.name]))
+        except Exception as e:
+            print(
+                f"WARNING: Skipping import for '{'.'.join(package_chain+[x.name])}' due to {type(e).__name__}: {str(e)}"
+            )
         if x.ispkg:
-            _load_extensions_path(os.path.join(path, x.name), False, package_chain+[x.name])
+            _load_extensions_path(os.path.join(path, x.name), package_chain+[x.name])
 
 
 class Flowmancer:
@@ -77,16 +107,18 @@ class Flowmancer:
         self._states = ExecutionStateMap()
         self._registered_extensions: Dict[str, Extension] = dict()
         self._registered_loggers: Dict[str, Logger] = dict()
+        self._checkpointer_instance: Checkpointer = FileCheckpointer()
         self._checkpoint_interval_seconds = 10
         self._tick_interval_seconds = 0.25
 
     def start(self) -> int:
         orig_cwd = os.getcwd()
         try:
-            # Ensure any components, such as file loggers, work with respect to the caller's project dir.
+            # Ensure any components, such as file loggers, work with respect to the .py file in which the `start`
+            # command is invoked, which is usually the project root dir.
             os.chdir(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])))
             if not self._test:
-                self._process_cmd_args()
+                self._process_cmd_args(orig_cwd)
             if not self._executors:
                 raise NoTasksLoadedError(
                     'No Tasks have been loaded! Please check that you have provided a valid Job Definition file.'
@@ -110,7 +142,7 @@ class Flowmancer:
             await asyncio.gather(*observer_tasks, *executor_tasks, *logger_tasks, checkpoint_task)
         return len(self._states[ExecutionState.FAILED]) + len(self._states[ExecutionState.DEFAULTED])
 
-    def _process_cmd_args(self) -> None:
+    def _process_cmd_args(self, caller_cwd: str) -> None:
         parser = ArgumentParser(description='Flowmancer job execution options.')
         parser.add_argument('-j', '--jobdef', action='store', dest='jobdef')
         parser.add_argument('-r', '--restart', action='store_true', dest='restart', default=False)
@@ -124,11 +156,12 @@ class Flowmancer:
         self._debug = args.debug
 
         if args.jobdef:
-            self.load_job_definition(args.jobdef)
+            jobdef_path = args.jobdef if args.jobdef.startswith('/') else os.path.join(caller_cwd, args.jobdef)
+            self.load_job_definition(jobdef_path)
 
         if args.restart:
             try:
-                cp = FileCheckpoint(checkpoint_name=self._config.name).read_checkpoint()
+                cp = self._checkpointer_instance.read_checkpoint(self._config.name)
                 self._shared_dict.update(cp.shared_dict)
                 for name in cp.states[ExecutionState.FAILED]:
                     self._executors[name].instance.is_restart = True
@@ -160,11 +193,12 @@ class Flowmancer:
     # ASYNC INITIALIZATIONS
     def _init_checkpointer(self, root_event) -> asyncio.Task:
         async def _write_checkpoint() -> None:
-            checkpoint = FileCheckpoint(checkpoint_name=self._config.name)
+            checkpointer = self._checkpointer_instance
             last_write = 0
             while True:
                 if (time.time() - last_write) >= self._checkpoint_interval_seconds:
-                    checkpoint.write_checkpoint(
+                    checkpointer.write_checkpoint(
+                        self._config.name,
                         CheckpointContents(
                             name=self._config.name,
                             states=self._states,
@@ -177,7 +211,7 @@ class Flowmancer:
                         and not self._states[ExecutionState.DEFAULTED]
                         and not self._states[ExecutionState.ABORTED]
                     ):
-                        checkpoint.clear_checkpoint()
+                        checkpointer.clear_checkpoint(self._config.name)
                     break
                 else:
                     await asyncio.sleep(self._tick_interval_seconds)
@@ -313,8 +347,15 @@ class Flowmancer:
 
         # Recursively import any modules found in the following paths in order to trigger the registration of any
         # decorated classes.
-        search_paths = ['./tasks', './extensions', './loggers'] + jobdef.config.extension_directories
-        for p in search_paths:
+        for p in ['./tasks', './extensions', './loggers']:
+            try:
+                _load_extensions_path(p)
+            except ExtensionsDirectoryNotFoundError:
+                # Don't error on the absence of dirs that are searched by default.
+                pass
+
+        # Allow for missing dir exceptions for passed-in paths.
+        for p in jobdef.config.extension_directories:
             _load_extensions_path(p)
 
         for p in jobdef.config.extension_packages:
@@ -330,6 +371,11 @@ class Flowmancer:
                 backoff=t.backoff,
                 parameters=t.parameters
             )
+
+        # Checkpointer
+        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer_config.checkpointer](
+            **jobdef.checkpointer_config.parameters
+        )
 
         # Observers
         for n, e in jobdef.extensions.items():

@@ -8,13 +8,13 @@ from pydantic import BaseModel, Extra
 
 from ..executor import ExecutionStateMap
 
-_checkpoint_classes = dict()
+_checkpointer_classes = dict()
 
 
-def checkpoint(t: type[Checkpoint]) -> Any:
-    if not issubclass(t, Checkpoint):
-        raise TypeError(f'Must extend `Checkpoint` type: {t.__name__}')
-    _checkpoint_classes[t.__name__] = t
+def checkpointer(t: type[Checkpointer]) -> Any:
+    if not issubclass(t, Checkpointer):
+        raise TypeError(f'Must extend `Checkpointer` type: {t.__name__}')
+    _checkpointer_classes[t.__name__] = t
     return t
 
 
@@ -29,19 +29,19 @@ class CheckpointContents:
     shared_dict: Dict[Any, Any]
 
 
-class Checkpoint(ABC, BaseModel):
+class Checkpointer(ABC, BaseModel):
     class Config:
         extra = Extra.forbid
         underscore_attrs_are_private = True
 
     @abstractmethod
-    def write_checkpoint(self, content: CheckpointContents) -> None:
+    def write_checkpoint(self, name: str, content: CheckpointContents) -> None:
         pass
 
     @abstractmethod
-    def read_checkpoint(self) -> CheckpointContents:
+    def read_checkpoint(self, name: str) -> CheckpointContents:
         pass
 
     @abstractmethod
-    def clear_checkpoint(self) -> None:
+    def clear_checkpoint(self, name: str) -> None:
         pass

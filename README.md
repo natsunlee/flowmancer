@@ -166,6 +166,19 @@ config:
     - internal_flowmancer_package
 ```
 
+### Changing Default File Logger Directory
+The Job Definition accepts an optional `loggers` section, which if left empty will default to using a `FileLogger` with default settings.
+To utilize the default `FileLogger`, but with a different configuration, explicitly provide the `loggers` block:
+```yaml
+loggers:
+  my-file-logger:
+    logger: FileLogger
+    parameters:
+      # NOTE: this path is relative to the `.py` file where `Flowmancer().start()` is invoked.
+      base_log_dir: ./my_custom_log_dir  # ./logs is the default, if omitted.
+      retention_days: 3  # 10 is the default, if omitted.
+```
+
 ### Complex Parameters
 While this is mostly used for `Task` implementations, the details outlined here apply for any built-in and custom `Extension` and `Logger` implementations.
 
@@ -228,7 +241,103 @@ In addition to the required `run` method, an implementation of `Task` may option
 Just as with `run`, all lifecycle methods have access to `self.shared_dict` and any parameters.
 
 ### Custom Loggers
-Coming soon.
+Custom implementations of the `Logger` may be provided to Flowmancer to either replace OR write to in addition to the default `FileLogger`.
+
+A custom implementation must extend the `Logger` class, be decorated with the `logger` decorator, and implement the async `update` method at minimum:
+```python
+@logger
+import json
+import requests
+from flowmancer.loggers.logger import Logger, logger
+
+class SlackMessageLogger(Logger):
+    webhook: str
+
+    def _post_to_slack(self, msg: str) -> None:
+        requests.post(
+            self.webhook,
+            data=json.dumps({'text': title, 'attachments': [{'text': msg}]}),
+            headers={'Content-Type': 'application/json'},
+        )
+
+    async def update(self, evt: SerializableLogEvent) -> None:
+        # The `LogStartEvent` and `LogEndEvent` events only have a `name` property.
+        if isinstance(evt, LogStartEvent):
+            self._post_to_slack(f'[{evt.name}] START: Logging is beginning')
+        elif isinstance(evt, LogEndEvent):
+            self._post_to_slack(f'[{evt.name}] END: Logging is ending')
+        # The `LogWriteEvent` additionally has `severity` and `message` properties.
+        elif isinstance(evt, LogWriteEvent):
+            self._post_to_slack(f'[{evt.name}] {evt.severity.value}: {evt.message}')
+```
+
+The `Logger` implementation may also have the following optional `async` lifecycle methods:
+* `on_create`
+* `on_restart`
+* `on_success`
+* `on_failure`
+* `on_destroy`
+* `on_abort`
+
+To incorporate your custom `Logger` into Flowmancer, ensure that it exists in a module either in `./loggers` or in a module listed in `config.extension_directories` in the Job Definition.
+
+This allows it to be provided in the `loggers` section of the Job Definition.
+> :warning: Providing the `loggers` section will remove the default logger (`FileLogger`) from your job's configuration.
+> If you want to add your custom logger alongside the default logger, the `FileLogger` must explicitly be configured.
+
+```yaml
+loggers:
+  # Load the default logger with default parameters
+  default-logger:
+    logger: FileLogger
+
+  # Custom logger implementation
+  slack-logger:
+    logger: SlackMessageLogger
+    parameters:
+      webhook: https://some.webhook.url
+```
 
 ### Custom Extensions
 Coming soon.
+
+### Custom Checkpointers
+Custom implementations of the `Checkpointer` may be provided to Flowmancer to replace the default `FileCheckpointer`.
+> :warning: Unlike loggers and extensions, only one checkpointer can be configured per Job Definition.
+
+A custom implementation must extend the `Checkpointer` class, be decorated with the `checkpointer` decorator, and implement the async `update` method at minimum:
+```python
+from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailableError, checkpointer
+
+@checkpointer
+class DatabaseCheckpointer(Checkpointer):
+    host: str
+    port: int
+    username: str
+    password: str
+
+    def write_checkpoint(self, name: str, content: CheckpointContents) -> None:
+        # Store checkpoint state - must be able to store contents of
+        # `CheckpointContents` in a way that it can be reconstructed later.
+
+    def read_checkpoint(self, name: str) -> CheckpointContents:
+        # Recall checkpoint state - reconstruct and return `CheckpointContents`
+        # if exists for `name`. Otherwise raise `NoCheckpointAvailableError`
+        # to indicate no valid checkpoint exists to restart from.
+
+    def clear_checkpoint(self, name: str) -> None:
+        # Remove checkpoint state for `name`.
+```
+
+To incorporate your custom `Checkpointer` into Flowmancer, ensure that it exists in a module either in `./extensions` or in a module listed in `config.extension_directories` in the Job Definition.
+
+This allows it to be provided in the `checkpointer_config` section of the Job Definition:
+```yaml
+checkpointer_config:
+  checkpointer: DatabaseCheckpointer
+  parameters:
+    host: something
+    port: 9999
+    username: user
+    password: 1234
+```

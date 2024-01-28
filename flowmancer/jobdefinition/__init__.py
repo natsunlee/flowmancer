@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Type, Union
+from typing import Any, Callable, Dict, List, Type
 
 from pydantic import BaseModel, Extra
 
@@ -26,7 +26,7 @@ class JobDefinitionComponent(BaseModel):
 
 class LoggerDefinition(JobDefinitionComponent):
     logger: str
-    parameters: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Any] = dict()
 
 
 class TaskDefinition(JobDefinitionComponent):
@@ -34,12 +34,12 @@ class TaskDefinition(JobDefinitionComponent):
     dependencies: List[str] = []
     max_attempts: int = 1
     backoff: int = 0
-    parameters: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Any] = dict()
 
 
 class ExtensionDefinition(JobDefinitionComponent):
     extension: str
-    parameters: Dict[str, Union[int, str]] = dict()
+    parameters: Dict[str, Any] = dict()
 
 
 class Configuration(JobDefinitionComponent):
@@ -49,12 +49,18 @@ class Configuration(JobDefinitionComponent):
     extension_packages: List[str] = []
 
 
+class CheckpointerDefinition(JobDefinitionComponent):
+    checkpointer: str
+    parameters: Dict[str, Any] = dict()
+
+
 class JobDefinition(JobDefinitionComponent):
     version: float = 0.1
     config: Configuration = Configuration()
     tasks: Dict[str, TaskDefinition]
     loggers: Dict[str, LoggerDefinition] = {'file-logger': LoggerDefinition(logger='FileLogger')}
     extensions: Dict[str, ExtensionDefinition] = {'progress-bar': ExtensionDefinition(extension='RichProgressBar')}
+    checkpointer_config: CheckpointerDefinition = CheckpointerDefinition(checkpointer='FileCheckpointer')
 
 
 class SerializableJobDefinition(ABC):
