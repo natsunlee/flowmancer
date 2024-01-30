@@ -572,23 +572,6 @@ pyyaml = ">=5.1"
 virtualenv = ">=20.10.0"
 
 [[package]]
-name = "pyaml-env"
-version = "1.2.1"
-description = "Provides yaml file parsing with environment variable resolution"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "pyaml_env-1.2.1-py3-none-any.whl", hash = "sha256:2e7da2d4bba0629711ade1a41864e5e200c84ded896a3d27e9f560fae7311c36"},
-    {file = "pyaml_env-1.2.1.tar.gz", hash = "sha256:6d5dc98c8c82df743a132c196e79963050c9feb05b0a6f25f3ad77771d3d95b0"},
-]
-
-[package.dependencies]
-PyYAML = ">=5.0,<=7.0"
-
-[package.extras]
-test = ["pytest"]
-
-[[package]]
 name = "pycodestyle"
 version = "2.8.0"
 description = "Python style guide checker"
@@ -998,4 +981,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "143bceccdd8587f5baaa19e563a78a4ac554b39fc0013811c3e4a39dc58a45e9"
+content-hash = "7ba1279095dfd8317ac34f09726921c10d851b4ea4a23b8733c2bccb91fff023"
