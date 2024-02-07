@@ -145,6 +145,7 @@ class Flowmancer:
     def _process_cmd_args(self, caller_cwd: str) -> None:
         parser = ArgumentParser(description='Flowmancer job execution options.')
         parser.add_argument('-j', '--jobdef', action='store', dest='jobdef')
+        parser.add_argument('-t', '--type', action='store', dest='jobdef_type', default='yaml')
         parser.add_argument('-r', '--restart', action='store_true', dest='restart', default=False)
         parser.add_argument('-d', '--debug', action='store_true', dest='debug', default=False)
         parser.add_argument('--skip', action='append', dest='skip', default=[])
@@ -157,7 +158,7 @@ class Flowmancer:
 
         if args.jobdef:
             jobdef_path = args.jobdef if args.jobdef.startswith('/') else os.path.join(caller_cwd, args.jobdef)
-            self.load_job_definition(jobdef_path)
+            self.load_job_definition(jobdef_path, args.jobdef_type)
 
         if args.restart:
             try:
@@ -336,11 +337,11 @@ class Flowmancer:
         self._executors[name] = ExecutorDetails(instance=e, dependencies=(deps or []))
         self._states[ExecutionState.INIT].add(name)
 
-    def load_job_definition(self, j: Union[JobDefinition, str], filetype: str = 'yaml') -> Flowmancer:
+    def load_job_definition(self, j: Union[JobDefinition, str], jobdef_type: str = 'yaml') -> Flowmancer:
         if isinstance(j, JobDefinition):
             jobdef = j
         else:
-            jobdef = _job_definition_classes[filetype]().load(j)
+            jobdef = _job_definition_classes[jobdef_type]().load(j)
 
         # Configurations
         self._config = jobdef.config
