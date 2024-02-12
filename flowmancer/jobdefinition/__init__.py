@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Type
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Type, Union
 
 from pydantic import BaseModel, Extra
 
@@ -42,7 +43,7 @@ class ExtensionDefinition(JobDefinitionComponent):
     parameters: Dict[str, Any] = dict()
 
 
-class Configuration(JobDefinitionComponent):
+class ConfigurationDefinition(JobDefinitionComponent):
     name: str = 'flowmancer'
     max_concurrency: int = 0
     extension_directories: List[str] = []
@@ -56,18 +57,26 @@ class CheckpointerDefinition(JobDefinitionComponent):
 
 class JobDefinition(JobDefinitionComponent):
     version: float = 0.1
-    config: Configuration = Configuration()
+    include: List[Path] = []
+    config: ConfigurationDefinition = ConfigurationDefinition()
     tasks: Dict[str, TaskDefinition]
     loggers: Dict[str, LoggerDefinition] = {'file-logger': LoggerDefinition(logger='FileLogger')}
     extensions: Dict[str, ExtensionDefinition] = {'progress-bar': ExtensionDefinition(extension='RichProgressBar')}
     checkpointer_config: CheckpointerDefinition = CheckpointerDefinition(checkpointer='FileCheckpointer')
 
 
+class LoadParams(BaseModel):
+    APP_ROOT_DIR: str = '.'
+
+    class Config:
+        extra = Extra.forbid
+
+
 class SerializableJobDefinition(ABC):
     @abstractmethod
-    def load(self, filename: str) -> JobDefinition:
+    def load(self, filename: Union[Path, str], params: LoadParams = LoadParams()) -> JobDefinition:
         pass
 
     @abstractmethod
-    def dump(self, jdef: JobDefinition, filename: str) -> None:
+    def dump(self, jdef: JobDefinition, filename: Union[Path, str]) -> None:
         pass
