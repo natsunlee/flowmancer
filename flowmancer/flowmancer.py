@@ -24,9 +24,10 @@ from .eventbus.log import SerializableLogEvent
 from .executor import ExecutionStateMap, Executor
 from .extensions.extension import Extension, _extension_classes
 from .jobdefinition import (
-    Configuration,
+    ConfigurationDefinition,
     ExtensionDefinition,
     JobDefinition,
+    LoadParams,
     LoggerDefinition,
     TaskDefinition,
     _job_definition_classes,
@@ -97,7 +98,7 @@ def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
 class Flowmancer:
     def __init__(self, *, test: bool = False, debug: bool = False) -> None:
         manager = Manager()
-        self._config: Configuration = Configuration()
+        self._config: ConfigurationDefinition = ConfigurationDefinition()
         self._test = test
         self._debug = debug
         self._log_event_bus = EventBus[SerializableLogEvent](manager.Queue())
@@ -116,9 +117,10 @@ class Flowmancer:
         try:
             # Ensure any components, such as file loggers, work with respect to the .py file in which the `start`
             # command is invoked, which is usually the project root dir.
-            os.chdir(os.path.dirname(os.path.abspath(inspect.stack()[-1][1])))
+            app_root_dir = os.path.dirname(os.path.abspath(inspect.stack()[-1][1]))
+            os.chdir(app_root_dir)
             if not self._test:
-                self._process_cmd_args(orig_cwd)
+                self._process_cmd_args(orig_cwd, app_root_dir)
             if not self._executors:
                 raise NoTasksLoadedError(
                     'No Tasks have been loaded! Please check that you have provided a valid Job Definition file.'
@@ -142,7 +144,7 @@ class Flowmancer:
             await asyncio.gather(*observer_tasks, *executor_tasks, *logger_tasks, checkpoint_task)
         return len(self._states[ExecutionState.FAILED]) + len(self._states[ExecutionState.DEFAULTED])
 
-    def _process_cmd_args(self, caller_cwd: str) -> None:
+    def _process_cmd_args(self, caller_cwd: str, app_root_dir: str) -> None:
         parser = ArgumentParser(description='Flowmancer job execution options.')
         parser.add_argument('-j', '--jobdef', action='store', dest='jobdef')
         parser.add_argument('-t', '--type', action='store', dest='jobdef_type', default='yaml')
@@ -158,7 +160,7 @@ class Flowmancer:
 
         if args.jobdef:
             jobdef_path = args.jobdef if args.jobdef.startswith('/') else os.path.join(caller_cwd, args.jobdef)
-            self.load_job_definition(jobdef_path, args.jobdef_type)
+            self.load_job_definition(jobdef_path, app_root_dir, args.jobdef_type)
 
         if args.restart:
             try:
@@ -337,11 +339,18 @@ class Flowmancer:
         self._executors[name] = ExecutorDetails(instance=e, dependencies=(deps or []))
         self._states[ExecutionState.INIT].add(name)
 
-    def load_job_definition(self, j: Union[JobDefinition, str], jobdef_type: str = 'yaml') -> Flowmancer:
+    def load_job_definition(
+        self,
+        j: Union[JobDefinition, str],
+        app_root_dir: str,
+        jobdef_type: str = 'yaml'
+    ) -> Flowmancer:
         if isinstance(j, JobDefinition):
             jobdef = j
         else:
-            jobdef = _job_definition_classes[jobdef_type]().load(j)
+            jobdef = _job_definition_classes[jobdef_type]().load(j, LoadParams(
+                APP_ROOT_DIR=app_root_dir
+            ))
 
         # Configurations
         self._config = jobdef.config
