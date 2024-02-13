@@ -189,3 +189,15 @@ def test_nested_include(
     jdef = load_yaml_jobdef('c.yaml')
     assert(jdef.config.name == 'c')
     assert(jdef.tasks['do-something'].task == 'DoSomethingElse')
+
+
+def test_relative_path_include(
+    write_yaml: Callable[[str, Dict[str, Any]], Path],
+    load_yaml_jobdef: Callable[[str], JobDefinition]
+) -> None:
+    a = {'tasks': {'do-something': {'task': 'DoSomething'}}}
+    b = {'include': ['./a.yaml'], 'tasks': {'do-something': {'task': 'DoSomethingElse'}}}
+    write_yaml('a.yaml', a)
+    write_yaml('b.yaml', b)
+    jdef = load_yaml_jobdef('b.yaml')
+    assert(jdef.tasks['do-something'].task == 'DoSomethingElse')
