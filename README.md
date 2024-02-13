@@ -231,9 +231,11 @@ Additionally, the above example could have all `include` values in the `complete
 config:
   name: complete-job
 
+# As with most paths in Job Definition, paths to `include` YAML files are relative to `.py` file where the `.start()`
+# method for Flowmancer is invoked.
 include:
-  - $SYS{APP_ROOT_DIR}/jobdefs/template.yaml
-  - $SYS{APP_ROOT_DIR}/jobdefs/cleanup_addon.yaml
+  - ./jobdefs/template.yaml
+  - ./jobdefs/cleanup_addon.yaml
 
 tasks:
   do-something:

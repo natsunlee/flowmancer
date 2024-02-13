@@ -348,9 +348,7 @@ class Flowmancer:
         if isinstance(j, JobDefinition):
             jobdef = j
         else:
-            jobdef = _job_definition_classes[jobdef_type]().load(j, LoadParams(
-                APP_ROOT_DIR=app_root_dir
-            ))
+            jobdef = _job_definition_classes[jobdef_type]().load(j, LoadParams(APP_ROOT_DIR=app_root_dir))
 
         # Configurations
         self._config = jobdef.config

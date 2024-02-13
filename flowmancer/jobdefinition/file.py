@@ -41,8 +41,9 @@ class YAMLJobDefinition(SerializableJobDefinition):
         yaml.add_constructor("!envvar", _build_path_constructor(env_var, dict(os.environ)), yaml.SafeLoader)
 
         def process_includes(jdef, merged, seen):
-            for rp in jdef.get('include', []):
-                p = os.path.abspath(rp)
+            for p in jdef.get('include', []):
+                if not p.startswith('/'):
+                    p = os.path.abspath(os.path.join(params.APP_ROOT_DIR, p))
                 if p in seen:
                     raise RuntimeError('asdf')
                 seen.add(p)
