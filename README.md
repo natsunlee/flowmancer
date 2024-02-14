@@ -166,6 +166,86 @@ config:
     - internal_flowmancer_package
 ```
 
+### Include YAML Files
+An optional `include` block may be defined in the Job Definition in order to merge multiple Job Definition YAML files.
+YAML files are provided in a list and processed in the order given, with the containing YAML being processed last.
+
+For example:
+```yaml
+# <app_root_dir>/jobdefs/template.yaml
+config:
+  name: generic-template
+
+tasks:
+  do-something:
+    task: DoSomething
+    parameters:
+      some_required_param: I am a required string parameter
+```
+
+```yaml
+# <app_root_dir>/jobdefs/cleanup_addon.yaml
+include:
+  - $SYS{APP_ROOT_DIR}/jobdefs/template.yaml
+
+tasks:
+  cleanup:
+    task: Cleanup
+    dependencies:
+      - do-something
+```
+
+```yaml
+# <app_root_dir>/jobdefs/complete.yaml
+config:
+  name: complete-job
+
+include:
+  - $SYS{APP_ROOT_DIR}/jobdefs/cleanup_addon.yaml
+
+tasks:
+  do-something:
+    task: Do Something
+    parameters:
+      added_optional_param: 99
+```
+
+Loading the `complete.yaml` job definition will result in a YAML equivalent to:
+```yaml
+config:
+  name: complete-job
+
+tasks:
+  do-something:
+    task: Do Something
+    parameters:
+      some_required_param: I am a required string parameter
+      added_optional_param: 99
+```
+
+> :warning: Array values are **NOT** merged like dictionaries are. Any array values (and therfore any nested structures) within them will be replaced if modified in a later YAML.
+
+Additionally, the above example could have all `include` values in the `complete.yaml` file and the `include` block removed from `cleanup_addon.yaml`:
+```yaml
+# <app_root_dir>/jobdefs/complete.yaml
+config:
+  name: complete-job
+
+# As with most paths in Job Definition, paths to `include` YAML files are relative to `.py` file where the `.start()`
+# method for Flowmancer is invoked.
+include:
+  - ./jobdefs/template.yaml
+  - ./jobdefs/cleanup_addon.yaml
+
+tasks:
+  do-something:
+    task: Do Something
+    parameters:
+      added_optional_param: 99
+```
+
+The `include` values are processed in order and results in the same outcome as the original example.
+
 ### Changing Default File Logger Directory
 The Job Definition accepts an optional `loggers` section, which if left empty will default to using a `FileLogger` with default settings.
 To utilize the default `FileLogger`, but with a different configuration, explicitly provide the `loggers` block:
