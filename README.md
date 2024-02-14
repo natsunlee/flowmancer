@@ -186,7 +186,7 @@ tasks:
 ```yaml
 # <app_root_dir>/jobdefs/cleanup_addon.yaml
 include:
-  - $SYS{APP_ROOT_DIR}/jobdefs/template.yaml
+  - ./jobdefs/template.yaml
 
 tasks:
   cleanup:
@@ -201,7 +201,7 @@ config:
   name: complete-job
 
 include:
-  - $SYS{APP_ROOT_DIR}/jobdefs/cleanup_addon.yaml
+  - ./jobdefs/cleanup_addon.yaml
 
 tasks:
   do-something:
