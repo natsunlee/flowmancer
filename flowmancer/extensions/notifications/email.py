@@ -13,7 +13,7 @@ class EmailNotification(Notification):
     sender_user: str
     sender_host: str
 
-    def send_notification(self, title: str, msg: str) -> None:
+    async def send_notification(self, title: str, msg: str) -> None:
         em = EmailMessage()
         em['From'] = f'{self.sender_user}@{self.sender_host}'
         em['Subject'] = title

@@ -111,6 +111,7 @@ class Flowmancer:
         self._checkpointer_instance: Checkpointer = FileCheckpointer()
         self._checkpoint_interval_seconds = 10
         self._tick_interval_seconds = 0.25
+        self._is_restart = False
 
     def start(self) -> int:
         orig_cwd = os.getcwd()
@@ -162,9 +163,12 @@ class Flowmancer:
             jobdef_path = args.jobdef if args.jobdef.startswith('/') else os.path.join(caller_cwd, args.jobdef)
             self.load_job_definition(jobdef_path, app_root_dir, args.jobdef_type)
 
+        # At this point, checkpointer cannot change and we need to allow it to initialize before attempting
+        # to restore state from checkpoint.
+        # asyncio.run(self._checkpointer_instance.on_create())
         if args.restart:
             try:
-                cp = self._checkpointer_instance.read_checkpoint(self._config.name)
+                cp = asyncio.run(self._checkpointer_instance.read_checkpoint(self._config.name))
                 self._shared_dict.update(cp.shared_dict)
                 for name in cp.states[ExecutionState.FAILED]:
                     self._executors[name].instance.is_restart = True
@@ -182,25 +186,36 @@ class Flowmancer:
                 cp.states[ExecutionState.DEFAULTED].clear()
                 cp.states[ExecutionState.COMPLETED].clear()
                 self._states = cp.states
+                self._is_restart = True
                 # Even though completed and don't require to be executed again, these tasks still need to trigger
                 # state change from INIT -> COMPLETED for components watching the Execution Event Bus.
                 for n in completed:
                     self._executors[n].instance.state = ExecutionState.COMPLETED
             except NoCheckpointAvailableError:
+                self._is_restart = False
                 print(f"No checkpoint file found for '{self._config.name}'. Starting new job.")
 
         # These override settings from JobsDefinition, if also defined there.
         if args.max_concurrency is not None:
             self._config.max_concurrency = args.max_concurrency
 
+    def _is_failed(self) -> bool:
+        return bool(
+            self._states[ExecutionState.FAILED]
+            or self._states[ExecutionState.DEFAULTED]
+            or self._states[ExecutionState.ABORTED]
+        )
+
     # ASYNC INITIALIZATIONS
     def _init_checkpointer(self, root_event) -> asyncio.Task:
         async def _write_checkpoint() -> None:
-            checkpointer = self._checkpointer_instance
             last_write = 0
+            await self._checkpointer_instance.on_create()
+            if self._is_restart:
+                await self._checkpointer_instance.on_restart()
             while True:
                 if (time.time() - last_write) >= self._checkpoint_interval_seconds:
-                    checkpointer.write_checkpoint(
+                    await self._checkpointer_instance.write_checkpoint(
                         self._config.name,
                         CheckpointContents(
                             name=self._config.name,
@@ -209,12 +224,12 @@ class Flowmancer:
                         )
                     )
                 if root_event.is_set():
-                    if (
-                        not self._states[ExecutionState.FAILED]
-                        and not self._states[ExecutionState.DEFAULTED]
-                        and not self._states[ExecutionState.ABORTED]
-                    ):
-                        checkpointer.clear_checkpoint(self._config.name)
+                    if self._is_failed():
+                        await self._checkpointer_instance.on_failure()
+                    else:
+                        await self._checkpointer_instance.on_success()
+                        await self._checkpointer_instance.clear_checkpoint(self._config.name)
+                    await self._checkpointer_instance.on_destroy()
                     break
                 else:
                     await asyncio.sleep(self._tick_interval_seconds)
@@ -246,16 +261,16 @@ class Flowmancer:
         async def _pusher() -> None:
             for log in self._registered_loggers.values():
                 await log.on_create()
+                if self._is_restart:
+                    await log.on_restart()
             while True:
                 while not self._log_event_bus.empty():
                     m = self._log_event_bus.get()
                     for log in self._registered_loggers.values():
-                        # TODO: schedule the update as a task instead of awaiting
                         await log.update(m)
                 if root_event.is_set():
-                    is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
                     for log in self._registered_loggers.values():
-                        if is_failed:
+                        if self._is_failed():
                             await log.on_failure()
                         else:
                             await log.on_success()
@@ -272,6 +287,8 @@ class Flowmancer:
         async def _pusher() -> None:
             for obs in self._registered_extensions.values():
                 await obs.on_create()
+                if self._is_restart:
+                    await obs.on_restart()
             while True:
                 while not self._execution_event_bus.empty():
                     e = self._execution_event_bus.get()
@@ -283,9 +300,8 @@ class Flowmancer:
                     for obs in self._registered_extensions.values():
                         await obs.update(e)
                 if root_event.is_set():
-                    is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
                     for obs in self._registered_extensions.values():
-                        if is_failed:
+                        if self._is_failed():
                             await obs.on_failure()
                         else:
                             await obs.on_success()

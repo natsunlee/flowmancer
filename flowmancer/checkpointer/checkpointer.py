@@ -7,6 +7,7 @@ from typing import Any, Dict
 from pydantic import BaseModel, Extra
 
 from ..executor import ExecutionStateMap
+from ..lifecycle import AsyncLifecycle
 
 _checkpointer_classes = dict()
 
@@ -29,19 +30,19 @@ class CheckpointContents:
     shared_dict: Dict[Any, Any]
 
 
-class Checkpointer(ABC, BaseModel):
+class Checkpointer(ABC, BaseModel, AsyncLifecycle):
     class Config:
         extra = Extra.forbid
         underscore_attrs_are_private = True
 
     @abstractmethod
-    def write_checkpoint(self, name: str, content: CheckpointContents) -> None:
+    async def write_checkpoint(self, name: str, content: CheckpointContents) -> None:
         pass
 
     @abstractmethod
-    def read_checkpoint(self, name: str) -> CheckpointContents:
+    async def read_checkpoint(self, name: str) -> CheckpointContents:
         pass
 
     @abstractmethod
-    def clear_checkpoint(self, name: str) -> None:
+    async def clear_checkpoint(self, name: str) -> None:
         pass

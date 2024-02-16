@@ -10,7 +10,7 @@ from .notification import Notification
 class SlackWebhookNotification(Notification):
     webhook: str
 
-    def send_notification(self, title: str, msg: str) -> None:
+    async def send_notification(self, title: str, msg: str) -> None:
         requests.post(
             self.webhook,
             data=json.dumps({'text': title, 'attachments': [{'text': msg}]}),
