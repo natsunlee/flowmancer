@@ -109,8 +109,11 @@ class Flowmancer:
         self._registered_extensions: Dict[str, Extension] = dict()
         self._registered_loggers: Dict[str, Logger] = dict()
         self._checkpointer_instance: Checkpointer = FileCheckpointer()
-        self._checkpoint_interval_seconds = 10
-        self._tick_interval_seconds = 0.25
+        self._checkpointer_interval_seconds = 10.0
+        self._extensions_interval_seconds = 0.25
+        self._loggers_interval_seconds = 0.25
+        self._synchro_interval_seconds = 0.25
+        self._is_restart = False
 
     def start(self) -> int:
         orig_cwd = os.getcwd()
@@ -164,7 +167,7 @@ class Flowmancer:
 
         if args.restart:
             try:
-                cp = self._checkpointer_instance.read_checkpoint(self._config.name)
+                cp = asyncio.run(self._checkpointer_instance.read_checkpoint(self._config.name))
                 self._shared_dict.update(cp.shared_dict)
                 for name in cp.states[ExecutionState.FAILED]:
                     self._executors[name].instance.is_restart = True
@@ -182,44 +185,59 @@ class Flowmancer:
                 cp.states[ExecutionState.DEFAULTED].clear()
                 cp.states[ExecutionState.COMPLETED].clear()
                 self._states = cp.states
+                self._is_restart = True
                 # Even though completed and don't require to be executed again, these tasks still need to trigger
                 # state change from INIT -> COMPLETED for components watching the Execution Event Bus.
                 for n in completed:
                     self._executors[n].instance.state = ExecutionState.COMPLETED
             except NoCheckpointAvailableError:
+                self._is_restart = False
                 print(f"No checkpoint file found for '{self._config.name}'. Starting new job.")
 
         # These override settings from JobsDefinition, if also defined there.
         if args.max_concurrency is not None:
             self._config.max_concurrency = args.max_concurrency
 
+    def _is_failed(self) -> bool:
+        return bool(
+            self._states[ExecutionState.FAILED]
+            or self._states[ExecutionState.DEFAULTED]
+            or self._states[ExecutionState.ABORTED]
+        )
+
     # ASYNC INITIALIZATIONS
     def _init_checkpointer(self, root_event) -> asyncio.Task:
         async def _write_checkpoint() -> None:
-            checkpointer = self._checkpointer_instance
-            last_write = 0
-            while True:
-                if (time.time() - last_write) >= self._checkpoint_interval_seconds:
-                    checkpointer.write_checkpoint(
-                        self._config.name,
-                        CheckpointContents(
-                            name=self._config.name,
-                            states=self._states,
-                            shared_dict=self._shared_dict.copy()
-                        )
-                    )
-                if root_event.is_set():
-                    if (
-                        not self._states[ExecutionState.FAILED]
-                        and not self._states[ExecutionState.DEFAULTED]
-                        and not self._states[ExecutionState.ABORTED]
-                    ):
-                        checkpointer.clear_checkpoint(self._config.name)
-                    break
-                else:
-                    await asyncio.sleep(self._tick_interval_seconds)
+            await self._checkpointer_instance.write_checkpoint(
+                self._config.name,
+                CheckpointContents(
+                    name=self._config.name,
+                    states=self._states,
+                    shared_dict=self._shared_dict.copy()
+                )
+            )
 
-        return asyncio.create_task(_write_checkpoint())
+        async def _pusher() -> None:
+            last_write = 0
+            await self._checkpointer_instance.on_create()
+            if self._is_restart:
+                await self._checkpointer_instance.on_restart()
+            while True:
+                if root_event.is_set():
+                    break
+                if (time.time() - last_write) >= self._checkpointer_interval_seconds:
+                    await _write_checkpoint()
+                await asyncio.sleep(self._synchro_interval_seconds)
+
+            if self._is_failed():
+                await _write_checkpoint()
+                await self._checkpointer_instance.on_failure()
+            else:
+                await self._checkpointer_instance.on_success()
+                await self._checkpointer_instance.clear_checkpoint(self._config.name)
+            await self._checkpointer_instance.on_destroy()
+
+        return asyncio.create_task(_pusher())
 
     def _init_executors(self, root_event: asyncio.Event) -> List[asyncio.Task]:
         async def _synchro() -> None:
@@ -231,7 +249,7 @@ class Flowmancer:
                 ):
                     root_event.set()
                 else:
-                    await asyncio.sleep(self._tick_interval_seconds)
+                    await asyncio.sleep(self._synchro_interval_seconds)
 
         return [asyncio.create_task(_synchro())] + [
             asyncio.create_task(dtl.instance.start())
@@ -243,25 +261,33 @@ class Flowmancer:
         if self._test:
             self._registered_loggers = dict()
 
+        async def _write_logs() -> None:
+            while not self._log_event_bus.empty():
+                m = self._log_event_bus.get()
+                for log in self._registered_loggers.values():
+                    await log.update(m)
+
         async def _pusher() -> None:
             for log in self._registered_loggers.values():
                 await log.on_create()
+                if self._is_restart:
+                    await log.on_restart()
+
+            last_trigger = 0
             while True:
-                while not self._log_event_bus.empty():
-                    m = self._log_event_bus.get()
-                    for log in self._registered_loggers.values():
-                        # TODO: schedule the update as a task instead of awaiting
-                        await log.update(m)
                 if root_event.is_set():
-                    is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
-                    for log in self._registered_loggers.values():
-                        if is_failed:
-                            await log.on_failure()
-                        else:
-                            await log.on_success()
-                        await log.on_destroy()
                     break
-                await asyncio.sleep(self._tick_interval_seconds)
+                if (time.time() - last_trigger) >= self._loggers_interval_seconds:
+                    await _write_logs()
+                await asyncio.sleep(self._synchro_interval_seconds)
+
+            await _write_logs()
+            for log in self._registered_loggers.values():
+                if self._is_failed():
+                    await log.on_failure()
+                else:
+                    await log.on_success()
+                await log.on_destroy()
 
         return [asyncio.create_task(_pusher())]
 
@@ -269,29 +295,38 @@ class Flowmancer:
         if self._test:
             self._registered_extensions = dict()
 
+        async def _emit() -> None:
+            while not self._execution_event_bus.empty():
+                e = self._execution_event_bus.get()
+                if self._debug:
+                    print(e)
+                if isinstance(e, ExecutionStateTransition):
+                    self._states[e.to_state].add(e.name)
+                    self._states[e.from_state].remove(e.name)
+                for obs in self._registered_extensions.values():
+                    await obs.update(e)
+
         async def _pusher() -> None:
             for obs in self._registered_extensions.values():
                 await obs.on_create()
+                if self._is_restart:
+                    await obs.on_restart()
+
+            last_trigger = 0
             while True:
-                while not self._execution_event_bus.empty():
-                    e = self._execution_event_bus.get()
-                    if self._debug:
-                        print(e)
-                    if isinstance(e, ExecutionStateTransition):
-                        self._states[e.to_state].add(e.name)
-                        self._states[e.from_state].remove(e.name)
-                    for obs in self._registered_extensions.values():
-                        await obs.update(e)
                 if root_event.is_set():
-                    is_failed = self._states[ExecutionState.FAILED] or self._states[ExecutionState.DEFAULTED]
-                    for obs in self._registered_extensions.values():
-                        if is_failed:
-                            await obs.on_failure()
-                        else:
-                            await obs.on_success()
-                        await obs.on_destroy()
                     break
-                await asyncio.sleep(self._tick_interval_seconds)
+                if (time.time() - last_trigger) >= self._extensions_interval_seconds:
+                    await _emit()
+                await asyncio.sleep(self._synchro_interval_seconds)
+
+            await _emit()
+            for obs in self._registered_extensions.values():
+                if self._is_failed():
+                    await obs.on_failure()
+                else:
+                    await obs.on_success()
+                await obs.on_destroy()
 
         return [asyncio.create_task(_pusher())]
 
@@ -352,6 +387,10 @@ class Flowmancer:
 
         # Configurations
         self._config = jobdef.config
+        self._synchro_interval_seconds = jobdef.config.synchro_interval_seconds
+        self._loggers_interval_seconds = jobdef.config.loggers_interval_seconds
+        self._extensions_interval_seconds = jobdef.config.extensions_interval_seconds
+        self._checkpointer_interval_seconds = jobdef.config.checkpointer_interval_seconds
 
         # Recursively import any modules found in the following paths in order to trigger the registration of any
         # decorated classes.
@@ -381,8 +420,8 @@ class Flowmancer:
             )
 
         # Checkpointer
-        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer_config.checkpointer](
-            **jobdef.checkpointer_config.parameters
+        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer.checkpointer](
+            **jobdef.checkpointer.parameters
         )
 
         # Observers

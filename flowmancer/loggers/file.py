@@ -16,17 +16,16 @@ class LogFileNotOpen(Exception):
     pass
 
 
-class FileLoggerState:
-    def __init__(self) -> None:
-        self.file_handles: Dict[str, TextIO] = dict()
-        self.ts_str = datetime.now().strftime('%Y-%m-%d.%H.%M.%S')
-
-
 @logger
 class FileLogger(Logger):
+    class FileLoggerState:
+        def __init__(self) -> None:
+            self.file_handles: Dict[str, TextIO] = dict()
+            self.ts_str = datetime.now().strftime('%Y-%m-%d.%H.%M.%S')
+
+    _state: FileLoggerState = FileLoggerState()
     base_log_dir: str = './logs'
     retention_days: int = 10
-    _state: FileLoggerState = FileLoggerState()
 
     @property
     def log_dir(self) -> str:

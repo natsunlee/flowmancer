@@ -48,6 +48,10 @@ class ConfigurationDefinition(JobDefinitionComponent):
     max_concurrency: int = 0
     extension_directories: List[str] = []
     extension_packages: List[str] = []
+    synchro_interval_seconds: float = 0.25
+    loggers_interval_seconds: float = 0.25
+    extensions_interval_seconds: float = 0.25
+    checkpointer_interval_seconds: float = 10.0
 
 
 class CheckpointerDefinition(JobDefinitionComponent):
@@ -62,7 +66,7 @@ class JobDefinition(JobDefinitionComponent):
     tasks: Dict[str, TaskDefinition]
     loggers: Dict[str, LoggerDefinition] = {'file-logger': LoggerDefinition(logger='FileLogger')}
     extensions: Dict[str, ExtensionDefinition] = {'progress-bar': ExtensionDefinition(extension='RichProgressBar')}
-    checkpointer_config: CheckpointerDefinition = CheckpointerDefinition(checkpointer='FileCheckpointer')
+    checkpointer: CheckpointerDefinition = CheckpointerDefinition(checkpointer='FileCheckpointer')
 
 
 class LoadParams(BaseModel):
