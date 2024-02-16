@@ -19,9 +19,10 @@ from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailabl
 from .checkpointer.checkpointer import _checkpointer_classes
 from .checkpointer.file import FileCheckpointer
 from .eventbus import EventBus
-from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
+from .eventbus.execution import ExecutionState, ExecutionStateMap, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import SerializableLogEvent
-from .executor import ExecutionStateMap, Executor
+from .exceptions import CheckpointInvalidError, ExtensionsDirectoryNotFoundError, NotAPackageError, NoTasksLoadedError
+from .executor import Executor
 from .extensions.extension import Extension, _extension_classes
 from .jobdefinition import (
     ConfigurationDefinition,
@@ -38,18 +39,6 @@ from .task import Task
 __all__ = ['Flowmancer']
 
 ExecutorDetails = namedtuple('ExecutorDetails', 'instance dependencies')
-
-
-class NoTasksLoadedError(Exception):
-    pass
-
-
-class ExtensionsDirectoryNotFoundError(Exception):
-    pass
-
-
-class NotAPackageError(Exception):
-    pass
 
 
 # Need to explicitly manage loop in case multiple instances of Flowmancer are run.
@@ -147,6 +136,23 @@ class Flowmancer:
             await asyncio.gather(*observer_tasks, *executor_tasks, *logger_tasks, checkpoint_task)
         return len(self._states[ExecutionState.FAILED]) + len(self._states[ExecutionState.DEFAULTED])
 
+    def _validate_checkpoint(self, checkpoint: CheckpointContents) -> None:
+        cp = set().union(*list(checkpoint.states.values()))
+        ex = set(self._executors.keys())
+        missing_in_checkpoint = ex.difference(cp)
+        missing_in_executors = cp.difference(ex)
+        if cp != ex:
+            msg = 'Task names in Checkpoint do not match registered task names!'
+            if missing_in_checkpoint:
+                msg += '\nTasks MISSING in Checkpoint:'
+                for n in missing_in_checkpoint:
+                    msg += f'\n  * {n}'
+            if missing_in_executors:
+                msg += '\nUNKNOWN tasks in Checkpoint:'
+                for n in missing_in_executors:
+                    msg += 'f\n  * {n}'
+            raise CheckpointInvalidError('Task names in Checkpoint do not match registered task names:')
+
     def _process_cmd_args(self, caller_cwd: str, app_root_dir: str) -> None:
         parser = ArgumentParser(description='Flowmancer job execution options.')
         parser.add_argument('-j', '--jobdef', action='store', dest='jobdef')
@@ -168,23 +174,25 @@ class Flowmancer:
         if args.restart:
             try:
                 cp = asyncio.run(self._checkpointer_instance.read_checkpoint(self._config.name))
+                self._validate_checkpoint(cp)
                 self._shared_dict.update(cp.shared_dict)
-                for name in cp.states[ExecutionState.FAILED]:
+                esm = ExecutionStateMap.from_simple_dict(cp.states)
+                for name in esm[ExecutionState.FAILED]:
                     self._executors[name].instance.is_restart = True
-                completed = cp.states[ExecutionState.COMPLETED].copy()
-                cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.FAILED])
-                cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.ABORTED])
-                cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.RUNNING])
-                cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.PENDING])
-                cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.DEFAULTED])
-                cp.states[ExecutionState.INIT].update(cp.states[ExecutionState.COMPLETED])
-                cp.states[ExecutionState.FAILED].clear()
-                cp.states[ExecutionState.ABORTED].clear()
-                cp.states[ExecutionState.RUNNING].clear()
-                cp.states[ExecutionState.PENDING].clear()
-                cp.states[ExecutionState.DEFAULTED].clear()
-                cp.states[ExecutionState.COMPLETED].clear()
-                self._states = cp.states
+                completed = esm[ExecutionState.COMPLETED].copy()
+                esm[ExecutionState.INIT].update(esm[ExecutionState.FAILED])
+                esm[ExecutionState.INIT].update(esm[ExecutionState.ABORTED])
+                esm[ExecutionState.INIT].update(esm[ExecutionState.RUNNING])
+                esm[ExecutionState.INIT].update(esm[ExecutionState.PENDING])
+                esm[ExecutionState.INIT].update(esm[ExecutionState.DEFAULTED])
+                esm[ExecutionState.INIT].update(esm[ExecutionState.COMPLETED])
+                esm[ExecutionState.FAILED].clear()
+                esm[ExecutionState.ABORTED].clear()
+                esm[ExecutionState.RUNNING].clear()
+                esm[ExecutionState.PENDING].clear()
+                esm[ExecutionState.DEFAULTED].clear()
+                esm[ExecutionState.COMPLETED].clear()
+                self._states = esm
                 self._is_restart = True
                 # Even though completed and don't require to be executed again, these tasks still need to trigger
                 # state change from INIT -> COMPLETED for components watching the Execution Event Bus.
@@ -212,7 +220,7 @@ class Flowmancer:
                 self._config.name,
                 CheckpointContents(
                     name=self._config.name,
-                    states=self._states,
+                    states=self._states.to_simple_dict(),
                     shared_dict=self._shared_dict.copy()
                 )
             )
