@@ -109,8 +109,10 @@ class Flowmancer:
         self._registered_extensions: Dict[str, Extension] = dict()
         self._registered_loggers: Dict[str, Logger] = dict()
         self._checkpointer_instance: Checkpointer = FileCheckpointer()
-        self._checkpoint_interval_seconds = 10
-        self._tick_interval_seconds = 0.25
+        self._checkpointer_interval_seconds = 10.0
+        self._extensions_interval_seconds = 0.25
+        self._loggers_interval_seconds = 0.25
+        self._synchro_interval_seconds = 0.25
         self._is_restart = False
 
     def start(self) -> int:
@@ -163,9 +165,6 @@ class Flowmancer:
             jobdef_path = args.jobdef if args.jobdef.startswith('/') else os.path.join(caller_cwd, args.jobdef)
             self.load_job_definition(jobdef_path, app_root_dir, args.jobdef_type)
 
-        # At this point, checkpointer cannot change and we need to allow it to initialize before attempting
-        # to restore state from checkpoint.
-        # asyncio.run(self._checkpointer_instance.on_create())
         if args.restart:
             try:
                 cp = asyncio.run(self._checkpointer_instance.read_checkpoint(self._config.name))
@@ -209,32 +208,36 @@ class Flowmancer:
     # ASYNC INITIALIZATIONS
     def _init_checkpointer(self, root_event) -> asyncio.Task:
         async def _write_checkpoint() -> None:
+            await self._checkpointer_instance.write_checkpoint(
+                self._config.name,
+                CheckpointContents(
+                    name=self._config.name,
+                    states=self._states,
+                    shared_dict=self._shared_dict.copy()
+                )
+            )
+
+        async def _pusher() -> None:
             last_write = 0
             await self._checkpointer_instance.on_create()
             if self._is_restart:
                 await self._checkpointer_instance.on_restart()
             while True:
-                if (time.time() - last_write) >= self._checkpoint_interval_seconds:
-                    await self._checkpointer_instance.write_checkpoint(
-                        self._config.name,
-                        CheckpointContents(
-                            name=self._config.name,
-                            states=self._states,
-                            shared_dict=self._shared_dict.copy()
-                        )
-                    )
                 if root_event.is_set():
-                    if self._is_failed():
-                        await self._checkpointer_instance.on_failure()
-                    else:
-                        await self._checkpointer_instance.on_success()
-                        await self._checkpointer_instance.clear_checkpoint(self._config.name)
-                    await self._checkpointer_instance.on_destroy()
                     break
-                else:
-                    await asyncio.sleep(self._tick_interval_seconds)
+                if (time.time() - last_write) >= self._checkpointer_interval_seconds:
+                    await _write_checkpoint()
+                await asyncio.sleep(self._synchro_interval_seconds)
 
-        return asyncio.create_task(_write_checkpoint())
+            if self._is_failed():
+                await _write_checkpoint()
+                await self._checkpointer_instance.on_failure()
+            else:
+                await self._checkpointer_instance.on_success()
+                await self._checkpointer_instance.clear_checkpoint(self._config.name)
+            await self._checkpointer_instance.on_destroy()
+
+        return asyncio.create_task(_pusher())
 
     def _init_executors(self, root_event: asyncio.Event) -> List[asyncio.Task]:
         async def _synchro() -> None:
@@ -246,7 +249,7 @@ class Flowmancer:
                 ):
                     root_event.set()
                 else:
-                    await asyncio.sleep(self._tick_interval_seconds)
+                    await asyncio.sleep(self._synchro_interval_seconds)
 
         return [asyncio.create_task(_synchro())] + [
             asyncio.create_task(dtl.instance.start())
@@ -258,25 +261,33 @@ class Flowmancer:
         if self._test:
             self._registered_loggers = dict()
 
+        async def _write_logs() -> None:
+            while not self._log_event_bus.empty():
+                m = self._log_event_bus.get()
+                for log in self._registered_loggers.values():
+                    await log.update(m)
+
         async def _pusher() -> None:
             for log in self._registered_loggers.values():
                 await log.on_create()
                 if self._is_restart:
                     await log.on_restart()
+
+            last_trigger = 0
             while True:
-                while not self._log_event_bus.empty():
-                    m = self._log_event_bus.get()
-                    for log in self._registered_loggers.values():
-                        await log.update(m)
                 if root_event.is_set():
-                    for log in self._registered_loggers.values():
-                        if self._is_failed():
-                            await log.on_failure()
-                        else:
-                            await log.on_success()
-                        await log.on_destroy()
                     break
-                await asyncio.sleep(self._tick_interval_seconds)
+                if (time.time() - last_trigger) >= self._loggers_interval_seconds:
+                    await _write_logs()
+                await asyncio.sleep(self._synchro_interval_seconds)
+
+            await _write_logs()
+            for log in self._registered_loggers.values():
+                if self._is_failed():
+                    await log.on_failure()
+                else:
+                    await log.on_success()
+                await log.on_destroy()
 
         return [asyncio.create_task(_pusher())]
 
@@ -284,30 +295,38 @@ class Flowmancer:
         if self._test:
             self._registered_extensions = dict()
 
+        async def _emit() -> None:
+            while not self._execution_event_bus.empty():
+                e = self._execution_event_bus.get()
+                if self._debug:
+                    print(e)
+                if isinstance(e, ExecutionStateTransition):
+                    self._states[e.to_state].add(e.name)
+                    self._states[e.from_state].remove(e.name)
+                for obs in self._registered_extensions.values():
+                    await obs.update(e)
+
         async def _pusher() -> None:
             for obs in self._registered_extensions.values():
                 await obs.on_create()
                 if self._is_restart:
                     await obs.on_restart()
+
+            last_trigger = 0
             while True:
-                while not self._execution_event_bus.empty():
-                    e = self._execution_event_bus.get()
-                    if self._debug:
-                        print(e)
-                    if isinstance(e, ExecutionStateTransition):
-                        self._states[e.to_state].add(e.name)
-                        self._states[e.from_state].remove(e.name)
-                    for obs in self._registered_extensions.values():
-                        await obs.update(e)
                 if root_event.is_set():
-                    for obs in self._registered_extensions.values():
-                        if self._is_failed():
-                            await obs.on_failure()
-                        else:
-                            await obs.on_success()
-                        await obs.on_destroy()
                     break
-                await asyncio.sleep(self._tick_interval_seconds)
+                if (time.time() - last_trigger) >= self._extensions_interval_seconds:
+                    await _emit()
+                await asyncio.sleep(self._synchro_interval_seconds)
+
+            await _emit()
+            for obs in self._registered_extensions.values():
+                if self._is_failed():
+                    await obs.on_failure()
+                else:
+                    await obs.on_success()
+                await obs.on_destroy()
 
         return [asyncio.create_task(_pusher())]
 
@@ -368,6 +387,10 @@ class Flowmancer:
 
         # Configurations
         self._config = jobdef.config
+        self._synchro_interval_seconds = jobdef.config.synchro_interval_seconds
+        self._loggers_interval_seconds = jobdef.config.loggers_interval_seconds
+        self._extensions_interval_seconds = jobdef.config.extensions_interval_seconds
+        self._checkpointer_interval_seconds = jobdef.config.checkpointer_interval_seconds
 
         # Recursively import any modules found in the following paths in order to trigger the registration of any
         # decorated classes.
@@ -397,8 +420,8 @@ class Flowmancer:
             )
 
         # Checkpointer
-        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer_config.checkpointer](
-            **jobdef.checkpointer_config.parameters
+        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer.checkpointer](
+            **jobdef.checkpointer.parameters
         )
 
         # Observers
