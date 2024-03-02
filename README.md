@@ -389,7 +389,7 @@ Coming soon.
 Custom implementations of the `Checkpointer` may be provided to Flowmancer to replace the default `FileCheckpointer`.
 > :warning: Unlike loggers and extensions, only one checkpointer can be configured per Job Definition.
 
-A custom implementation must extend the `Checkpointer` class, be decorated with the `checkpointer` decorator, and implement the async `update` method at minimum:
+A custom implementation must extend the `Checkpointer` class, be decorated with the `checkpointer` decorator, and implement the async `write_checkpoint`, `read_checkpoint`, and `clear_checkpoints` methods at minimum. It may also optinoally implement async lifecycle methods, similar to [Custom Loggers](#custom-loggers):
 ```python
 from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailableError, checkpointer
 
