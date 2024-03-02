@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Set
 
 from pydantic import BaseModel, Extra
 
-from ..executor import ExecutionStateMap
 from ..lifecycle import AsyncLifecycle
 
 _checkpointer_classes = dict()
@@ -26,7 +25,7 @@ class NoCheckpointAvailableError(Exception):
 @dataclass
 class CheckpointContents:
     name: str
-    states: ExecutionStateMap
+    states: Dict[str, Set[str]]
     shared_dict: Dict[Any, Any]
 
 

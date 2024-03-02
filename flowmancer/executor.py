@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from multiprocessing import Process
 from multiprocessing.managers import DictProxy
 from multiprocessing.sharedctypes import Value
-from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Optional, Set, TextIO, Type, Union, cast
+from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Optional, TextIO, Type, Union, cast
 
 from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
@@ -19,29 +19,6 @@ from .task import Task, _task_classes
 
 async def _default_await_dependencies() -> bool:
     return True
-
-
-class ExecutionStateMap:
-    def __init__(self) -> None:
-        self.data: Dict[ExecutionState, Set[str]] = dict()
-
-    def __getitem__(self, k: Union[str, ExecutionState]) -> Set[str]:
-        es = ExecutionState(k)
-        if es not in self.data:
-            self.data[es] = set()
-        return self.data[ExecutionState(k)]
-
-    def __str__(self):
-        return str(self.data)
-
-    def items(self):
-        return self.data.items()
-
-    def keys(self):
-        return self.data.keys()
-
-    def values(self):
-        return self.data.values()
 
 
 class ProcessResult:
