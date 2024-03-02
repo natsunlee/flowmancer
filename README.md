@@ -153,6 +153,10 @@ In the `config` block of the Job Definition, the following optional parameters m
 |max_concurrency|int|0|Maximum number tasks that can run in parallel. If 0 or less, then there is no limit.|
 |extension_directories|List[str]|[]|List of paths, either absolute or relative to driver `.py` file, that contain any `@task`, `@logger`, or `@extension` decorated classes to make accessible to Flowmancer. The `./task`, `./extensions`, and `./loggers` directories are ALWAYS checked by default.|
 |extension_packages|List[str]|[]|List of installed Python packages that contain `@task`, `@logger`, or `@extension` decorated classes to make accessible to Flowmancer.|
+|synchro_interval_seconds|float|0.25|Core execution loop interval for waking and checking status of tasks and whether loggers/extensions/checkpointer should trigger.|
+|loggers_interval_seconds|float|0.25|Interval in seconds to wait before emitting log messages to configured `Logger` instances.|
+|extensions_interval_seconds|float|0.25|Interval in seconds to wait before emitting state change information to configured `Extension` instances.|
+|checkpointer_interval_seconds|float|10.0|Interval in seconds to wait before writing checkpoint information to the configured `Checkpointer`.|
 
 For example:
 ```yaml
@@ -411,9 +415,9 @@ class DatabaseCheckpointer(Checkpointer):
 
 To incorporate your custom `Checkpointer` into Flowmancer, ensure that it exists in a module either in `./extensions` or in a module listed in `config.extension_directories` in the Job Definition.
 
-This allows it to be provided in the `checkpointer_config` section of the Job Definition:
+This allows it to be provided in the `checkpointer` section of the Job Definition:
 ```yaml
-checkpointer_config:
+checkpointer:
   checkpointer: DatabaseCheckpointer
   parameters:
     host: something

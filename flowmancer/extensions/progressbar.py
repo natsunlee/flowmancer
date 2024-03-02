@@ -9,18 +9,17 @@ from ..executor import ExecutionState, ExecutionStateTransition, SerializableExe
 from .extension import Extension, extension
 
 
-class RichProgressBarState:
-    def __init__(self) -> None:
-        self.state_counts: Dict[ExecutionState, int]
-        self.start_time: float
-        self.progress: Progress
-        self.event: asyncio.Event
-        self.task: TaskID
-        self.update_task: asyncio.Task
-
-
 @extension
 class RichProgressBar(Extension):
+    class RichProgressBarState:
+        def __init__(self) -> None:
+            self.state_counts: Dict[ExecutionState, int]
+            self.start_time: float
+            self.progress: Progress
+            self.event: asyncio.Event
+            self.task: TaskID
+            self.update_task: asyncio.Task
+
     _state: RichProgressBarState = RichProgressBarState()
 
     def _update_pbar(self, advance: int = 0) -> None:

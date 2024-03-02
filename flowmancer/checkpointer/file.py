@@ -9,7 +9,7 @@ from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailabl
 class FileCheckpointer(Checkpointer):
     checkpoint_dir: str = './.flowmancer'
 
-    def write_checkpoint(self, name: str, content: CheckpointContents) -> None:
+    async def write_checkpoint(self, name: str, content: CheckpointContents) -> None:
         cdir = Path(self.checkpoint_dir)
         if not os.path.exists(cdir):
             os.makedirs(cdir, exist_ok=True)
@@ -21,13 +21,13 @@ class FileCheckpointer(Checkpointer):
             os.unlink(perm)
         os.rename(tmp, perm)
 
-    def read_checkpoint(self, name: str) -> CheckpointContents:
+    async def read_checkpoint(self, name: str) -> CheckpointContents:
         checkpoint_file = Path(self.checkpoint_dir) / name
         if not checkpoint_file.exists():
             raise NoCheckpointAvailableError(f'Checkpoint file does not exist: {checkpoint_file}')
         return pickle.load(open(checkpoint_file, 'rb'))
 
-    def clear_checkpoint(self, name: str) -> None:
+    async def clear_checkpoint(self, name: str) -> None:
         cfile = Path(self.checkpoint_dir) / name
         if os.path.isfile(cfile):
             os.unlink(cfile)
