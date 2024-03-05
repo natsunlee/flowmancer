@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict
 
 from .lifecycle import Lifecycle
 
@@ -18,16 +18,12 @@ def task(t: type[Task]):
 
 
 class Task(ABC, BaseModel, Lifecycle):
+    model_config = ConfigDict(extra='forbid', use_enum_values=True)
     _shared_dict: Dict[str, Any] = dict()
 
     @property
     def shared_dict(self) -> Dict[str, Any]:
         return self._shared_dict
-
-    class Config:
-        extra = Extra.forbid
-        underscore_attrs_are_private = True
-        use_enum_values = True
 
     @abstractmethod
     def run(self) -> None:

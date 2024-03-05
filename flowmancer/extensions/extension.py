@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict
 
 from ..executor import SerializableExecutionEvent
 from ..lifecycle import AsyncLifecycle
@@ -18,10 +18,7 @@ def extension(t: type[Extension]):
 
 
 class Extension(ABC, AsyncLifecycle, BaseModel):
-    class Config:
-        extra = Extra.forbid
-        underscore_attrs_are_private = True
-        use_enum_values = True
+    model_config = ConfigDict(extra='forbid', use_enum_values=True)
 
     @abstractmethod
     async def update(self, e: SerializableExecutionEvent) -> None:
