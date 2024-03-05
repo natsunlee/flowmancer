@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Set
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict
 
 from ..lifecycle import AsyncLifecycle
 
@@ -30,9 +30,7 @@ class CheckpointContents:
 
 
 class Checkpointer(ABC, BaseModel, AsyncLifecycle):
-    class Config:
-        extra = Extra.forbid
-        underscore_attrs_are_private = True
+    model_config = ConfigDict(extra='forbid', use_enum_values=True)
 
     @abstractmethod
     async def write_checkpoint(self, name: str, content: CheckpointContents) -> None:

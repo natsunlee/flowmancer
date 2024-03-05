@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Type, Union
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict
 
 _job_definition_classes = dict()
 
@@ -19,10 +19,7 @@ def job_definition(key: str) -> Callable:
 
 
 class JobDefinitionComponent(BaseModel):
-    class Config:
-        extra = Extra.forbid
-        underscore_attrs_are_private = True
-        use_enum_values = True
+    model_config = ConfigDict(extra='forbid', use_enum_values=True)
 
 
 class LoggerDefinition(JobDefinitionComponent):
@@ -70,10 +67,8 @@ class JobDefinition(JobDefinitionComponent):
 
 
 class LoadParams(BaseModel):
+    model_config = ConfigDict(extra='forbid', use_enum_values=True)
     APP_ROOT_DIR: str = '.'
-
-    class Config:
-        extra = Extra.forbid
 
 
 class SerializableJobDefinition(ABC):

@@ -6,7 +6,7 @@ from collections import defaultdict
 from queue import Queue
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, ConfigDict
 
 _event_classes: Dict[str, Dict[str, Type[SerializableEvent]]] = defaultdict(dict)
 
@@ -20,10 +20,7 @@ class NotADeserializableEventError(Exception):
 
 
 class SerializableEvent(BaseModel, ABC):
-    class Config:
-        extra = Extra.forbid
-        underscore_attrs_are_private = True
-        use_enum_values = True
+    model_config = ConfigDict(extra='forbid', use_enum_values=True)
 
     @classmethod
     @abstractmethod
@@ -32,7 +29,7 @@ class SerializableEvent(BaseModel, ABC):
 
     def serialize(self) -> str:
         try:
-            return json.dumps({'group': self.event_group(), 'event': type(self).__name__, 'body': self.dict()})
+            return json.dumps({'group': self.event_group(), 'event': type(self).__name__, 'body': self.model_dump()})
         except Exception as e:
             raise NotASerializableEventError(str(e))
 
