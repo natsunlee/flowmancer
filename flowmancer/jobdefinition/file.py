@@ -59,4 +59,4 @@ class YAMLJobDefinition(SerializableJobDefinition):
 
     def dump(self, jdef: JobDefinition, filename: Union[Path, str]) -> None:
         with open(filename, 'r') as f:
-            f.write(yaml.dump(jdef.dict()))
+            f.write(yaml.dump(jdef.model_dump()))
