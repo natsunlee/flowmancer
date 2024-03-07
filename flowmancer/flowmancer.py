@@ -104,7 +104,7 @@ class Flowmancer:
         self._synchro_interval_seconds = 0.25
         self._is_restart = False
 
-    def start(self) -> int:
+    def start(self, default_jobdef_path: Optional[str] = None, default_jobdef_type: str = 'yaml') -> int:
         orig_cwd = os.getcwd()
         try:
             # Ensure any components, such as file loggers, work with respect to the .py file in which the `start`
@@ -112,7 +112,7 @@ class Flowmancer:
             app_root_dir = os.path.dirname(os.path.abspath(inspect.stack()[-1][1]))
             os.chdir(app_root_dir)
             if not self._test:
-                self._process_cmd_args(orig_cwd, app_root_dir)
+                self._process_cmd_args(orig_cwd, app_root_dir, default_jobdef_path, default_jobdef_type)
             if not self._executors:
                 raise NoTasksLoadedError(
                     'No Tasks have been loaded! Please check that you have provided a valid Job Definition file.'
@@ -153,10 +153,16 @@ class Flowmancer:
                     msg += 'f\n  * {n}'
             raise CheckpointInvalidError('Task names in Checkpoint do not match registered task names:')
 
-    def _process_cmd_args(self, caller_cwd: str, app_root_dir: str) -> None:
+    def _process_cmd_args(
+        self,
+        caller_cwd: str,
+        app_root_dir: str,
+        default_jobdef_path: Optional[str] = None,
+        default_jobdef_type: str = 'yaml'
+    ) -> None:
         parser = ArgumentParser(description='Flowmancer job execution options.')
-        parser.add_argument('-j', '--jobdef', action='store', dest='jobdef')
-        parser.add_argument('-t', '--type', action='store', dest='jobdef_type', default='yaml')
+        parser.add_argument('-j', '--jobdef', action='store', dest='jobdef', default=default_jobdef_path)
+        parser.add_argument('-t', '--type', action='store', dest='jobdef_type', default=default_jobdef_type)
         parser.add_argument('-r', '--restart', action='store_true', dest='restart', default=False)
         parser.add_argument('-d', '--debug', action='store_true', dest='debug', default=False)
         parser.add_argument('--skip', action='append', dest='skip', default=[])
