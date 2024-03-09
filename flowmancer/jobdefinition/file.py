@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, Pattern, Union
+from typing import Any, Callable, Dict, Optional, Pattern, Union
 
 import yaml
 
@@ -27,7 +27,9 @@ def _build_path_constructor(var_matcher: Pattern[str], val_dict: Dict[str, Any])
 
 @job_definition('yaml')
 class YAMLJobDefinition(SerializableJobDefinition):
-    def load(self, filename: Union[Path, str], params: LoadParams = LoadParams()) -> JobDefinition:
+    def load(
+        self, filename: Union[Path, str], params: LoadParams = LoadParams(), vars: Optional[Dict[str, str]] = None
+    ) -> JobDefinition:
         # Add constructor for built-in vars
         sys_tag = re.compile(r'[^$]*\$SYS{([^}^{]+)}.*')
         sys_var = re.compile(r'\$SYS{([^}^{]+)}')
@@ -39,6 +41,12 @@ class YAMLJobDefinition(SerializableJobDefinition):
         env_var = re.compile(r'\$ENV{([^}^{]+)}')
         yaml.add_implicit_resolver("!envvar", env_tag, None, yaml.SafeLoader)
         yaml.add_constructor("!envvar", _build_path_constructor(env_var, dict(os.environ)), yaml.SafeLoader)
+
+        # Add constructor for input vars
+        input_tag = re.compile(r'[^$]*\$VAR{([^}^{]+)}.*')
+        input_var = re.compile(r'\$VAR{([^}^{]+)}')
+        yaml.add_implicit_resolver("!inputvar", input_tag, None, yaml.SafeLoader)
+        yaml.add_constructor("!inputvar", _build_path_constructor(input_var, vars or dict()), yaml.SafeLoader)
 
         def process_includes(jdef, merged, seen):
             for p in jdef.get('include', []):
