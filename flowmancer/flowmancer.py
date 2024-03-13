@@ -103,6 +103,19 @@ class Flowmancer:
         self._loggers_interval_seconds = 0.25
         self._synchro_interval_seconds = 0.25
         self._is_restart = False
+        self._jobdef_vars: Dict[str, str] = dict()
+
+    def set_jobdef_var(self, key: str, value: str) -> None:
+        if not isinstance(key, str):
+            raise TypeError(f'str expected for `key`, not {type(key)}')
+        if not isinstance(value, str):
+            raise TypeError(f'str expected for `value`, not {type(value)}')
+        self._jobdef_vars[key] = value
+
+    def unset_jobdef_var(self, key: str) -> None:
+        if not isinstance(key, str):
+            raise TypeError(f'str expected for `key`, not {type(key)}')
+        del self._jobdef_vars[key]
 
     def start(self, default_jobdef_path: Optional[str] = None, default_jobdef_type: str = 'yaml') -> int:
         orig_cwd = os.getcwd()
@@ -173,9 +186,16 @@ class Flowmancer:
         parser.add_argument('--run-to', action='store', dest='run_to')
         parser.add_argument('--run-from', action='store', dest='run_from')
         parser.add_argument('--max-concurrency', action='store', type=int, dest='max_concurrency')
+        parser.add_argument('--var', action='append', dest='jobdef_vars', default=[])
 
         args = parser.parse_args()
         self._debug = args.debug
+
+        for v in args.jobdef_vars:
+            parts = v.split('=')
+            if len(parts) <= 1:
+                raise ValueError('`var` arguments must follow the pattern: <key>=<value>')
+            self.set_jobdef_var(parts[0], '='.join(parts[1:]))
 
         if args.jobdef:
             jobdef_path = args.jobdef if args.jobdef.startswith('/') else os.path.join(caller_cwd, args.jobdef)
@@ -401,7 +421,9 @@ class Flowmancer:
         if isinstance(j, JobDefinition):
             jobdef = j
         else:
-            jobdef = _job_definition_classes[jobdef_type]().load(j, LoadParams(APP_ROOT_DIR=app_root_dir))
+            jobdef = _job_definition_classes[jobdef_type]().load(
+                j, LoadParams(APP_ROOT_DIR=app_root_dir), self._jobdef_vars
+            )
 
         # Configurations
         self._config = jobdef.config
