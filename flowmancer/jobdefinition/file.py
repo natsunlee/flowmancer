@@ -53,7 +53,7 @@ class YAMLJobDefinition(SerializableJobDefinition):
                 if not p.startswith('/'):
                     p = os.path.abspath(os.path.join(params.APP_ROOT_DIR, p))
                 if p in seen:
-                    raise RuntimeError('asdf')
+                    raise RuntimeError(f'JobDef YAML file has already been processed once: {p}')
                 seen.add(p)
                 with open(p, 'r') as f:
                     cur = yaml.safe_load(f.read())
