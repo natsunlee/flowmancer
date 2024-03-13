@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -73,7 +73,9 @@ class LoadParams(BaseModel):
 
 class SerializableJobDefinition(ABC):
     @abstractmethod
-    def load(self, filename: Union[Path, str], params: LoadParams = LoadParams()) -> JobDefinition:
+    def load(
+        self, filename: Union[Path, str], params: LoadParams = LoadParams(), vars: Optional[Dict[str, str]] = None
+    ) -> JobDefinition:
         pass
 
     @abstractmethod
