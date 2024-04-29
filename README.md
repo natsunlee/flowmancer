@@ -333,6 +333,7 @@ A custom implementation must extend the `Logger` class, be decorated with the `l
 import json
 import requests
 from flowmancer.loggers.logger import Logger, logger
+from flowmancer.eventbus.log import LogEndEvent, LogStartEvent, LogWriteEvent, SerializableLogEvent
 
 class SlackMessageLogger(Logger):
     webhook: str
@@ -352,7 +353,7 @@ class SlackMessageLogger(Logger):
             self._post_to_slack(f'[{evt.name}] END: Logging is ending')
         # The `LogWriteEvent` additionally has `severity` and `message` properties.
         elif isinstance(evt, LogWriteEvent):
-            self._post_to_slack(f'[{evt.name}] {evt.severity.value}: {evt.message}')
+            self._post_to_slack(f'[{evt.name}] {evt.severity}: {evt.message}')
 ```
 
 The `Logger` implementation may also have the following optional `async` lifecycle methods:
