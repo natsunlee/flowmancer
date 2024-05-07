@@ -43,17 +43,31 @@ class UnknownLogEvent(SerializableLogEvent):
 
 
 class LogWriter:
-    __slots__ = ('b', 'n')
+    __slots__ = ('bus', 'name')
 
-    def __init__(self, n: str, b: Optional[EventBus[SerializableLogEvent]]) -> None:
-        self.n = n
-        self.b = b
-        if self.b:
-            self.b.put(LogStartEvent(name=self.n))
+    def __init__(self, name: str, bus: Optional[EventBus[SerializableLogEvent]]) -> None:
+        self.name = name
+        self.bus = bus
+        if self.bus:
+            self.bus.put(LogStartEvent(name=self.name))
+
+    def emit_log_write_event(self, message: str, severity: Severity) -> None:
+        if self.bus:
+            self.bus.put(LogWriteEvent(name=self.name, severity=severity, message=message))
+
+    def close(self) -> None:
+        if self.bus:
+            self.bus.put(LogEndEvent(name=self.name))
+
+
+class StdOutLogWriterWrapper:
+    __slots__ = ('_base')
+
+    def __init__(self, log_writer: LogWriter) -> None:
+        self._base = log_writer
 
     def write(self, m: str) -> None:
-        if self.b:
-            self.b.put(LogWriteEvent(name=self.n, severity=Severity.INFO, message=m))
+        self._base.emit_log_write_event(m, Severity.INFO)
 
     def writelines(self, mlist: Iterable[str]) -> None:
         for m in mlist:
@@ -64,5 +78,32 @@ class LogWriter:
         pass
 
     def close(self) -> None:
-        if self.b:
-            self.b.put(LogEndEvent(name=self.n))
+        # Need to imitate file-like object for redirecting stdout
+        pass
+
+
+class StdErrLogWriterWrapper(StdOutLogWriterWrapper):
+    def write(self, m: str) -> None:
+        self._base.emit_log_write_event(m, Severity.ERROR)
+
+
+class TaskLogWriterWrapper:
+    __slots__ = ('_base')
+
+    def __init__(self, log_writer: LogWriter) -> None:
+        self._base = log_writer
+
+    def debug(self, m: str) -> None:
+        self._base.emit_log_write_event(m, Severity.DEBUG)
+
+    def info(self, m: str) -> None:
+        self._base.emit_log_write_event(m, Severity.INFO)
+
+    def warning(self, m: str) -> None:
+        self._base.emit_log_write_event(m, Severity.WARNING)
+
+    def error(self, m: str) -> None:
+        self._base.emit_log_write_event(m, Severity.ERROR)
+
+    def critical(self, m: str) -> None:
+        self._base.emit_log_write_event(m, Severity.CRITICAL)

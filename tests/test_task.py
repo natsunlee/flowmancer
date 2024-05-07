@@ -26,7 +26,6 @@ def test_task_deco_exception():
 def test_task_shared_dict():
     m = Manager()
     shared_dict = m.dict()
-    task_instance = _task_classes['TestTask']()
-    task_instance._shared_dict = cast(Dict[str, Any], shared_dict)
+    task_instance = _task_classes['TestTask'](shared_dict=cast(Dict[str, Any], shared_dict))
     task_instance.run()
     assert(shared_dict['myvar'] == 'hello')

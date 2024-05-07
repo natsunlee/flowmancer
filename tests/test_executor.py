@@ -4,10 +4,8 @@ from typing import Any, Dict, List, Tuple, cast
 import pytest
 
 from flowmancer.eventbus import EventBus
-from flowmancer.eventbus.execution import (ExecutionState,
-                                           ExecutionStateTransition,
-                                           SerializableExecutionEvent)
-from flowmancer.eventbus.log import LogWriteEvent, SerializableLogEvent
+from flowmancer.eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
+from flowmancer.eventbus.log import LogWriteEvent, SerializableLogEvent, Severity
 from flowmancer.executor import Executor, ProcessResult, exec_task_lifecycle
 from flowmancer.task import _task_classes
 
@@ -19,7 +17,7 @@ from flowmancer.task import _task_classes
 def test_exec_task_lifecycle_retcode(c: str, is_failed: bool):
     TaskClass = _task_classes[c]
     result = ProcessResult()
-    exec_task_lifecycle(c, TaskClass(), None, result, dict())
+    exec_task_lifecycle(c, TaskClass, None, None, result, dict())
     assert(result.is_failed == is_failed)
 
 
@@ -32,7 +30,7 @@ def test_exec_task_lifecycle_retcode_multiprocess(c: str, is_failed: bool):
     result = ProcessResult()
     proc = Process(
         target=exec_task_lifecycle,
-        args=(c, TaskClass(), None, result),
+        args=(c, TaskClass, None, None, result),
         daemon=False
     )
     proc.start()
@@ -44,7 +42,7 @@ def test_exec_task_lifecycle_order_success():
     LifecycleSuccessTask = _task_classes['LifecycleSuccessTask']
     d: Dict[str, Any] = {'events': []}
     result = ProcessResult()
-    exec_task_lifecycle('Test', LifecycleSuccessTask(), None, result, d)
+    exec_task_lifecycle('Test', LifecycleSuccessTask, None, None, result, d)
     assert(d['events'] == ['on_create', 'run', 'on_success', 'on_destroy'])
 
 
@@ -52,7 +50,7 @@ def test_exec_task_lifecycle_order_fail(manager):
     LifecycleFailTask = _task_classes['LifecycleFailTask']
     d: Dict[str, Any] = {'events': []}
     result = ProcessResult()
-    exec_task_lifecycle('Test', LifecycleFailTask(), None, result, d)
+    exec_task_lifecycle('Test', LifecycleFailTask, None, None, result, d)
     assert(d['events'] == ['on_create', 'Failing!', 'on_failure', 'on_destroy'])
 
 
@@ -127,7 +125,7 @@ def test_exec_task_lifecycle_shared_dict(manager):
     TestTask = _task_classes['TestTask']
     shared_dict = manager.dict()
     result = ProcessResult()
-    exec_task_lifecycle('Test', TestTask(), None, result, shared_dict)
+    exec_task_lifecycle('Test', TestTask, None, None, result, shared_dict)
     assert(shared_dict['myvar'] == 'hello')
 
 
@@ -149,7 +147,7 @@ def test_task_log_queue(manager):
     result = ProcessResult()
     proc = Process(
         target=exec_task_lifecycle,
-        args=('Test', LifecycleSuccessTask(), bus, result, shared_dict),
+        args=('Test', LifecycleSuccessTask, None, bus, result, shared_dict),
         daemon=False
     )
     proc.start()
@@ -159,5 +157,31 @@ def test_task_log_queue(manager):
         msg = bus.get()
         if isinstance(msg, LogWriteEvent) and msg.message != '\n':
             log_result.append(msg.message)
-    print(log_result)
     assert(log_result == ['on_create', 'run', 'on_success', 'on_destroy'])
+
+
+def test_task_log_wrapper_stdout(manager):
+    WriteAllLogTypes = _task_classes['WriteAllLogTypes']
+    bus = EventBus[SerializableLogEvent](manager.Queue())
+    result = ProcessResult()
+    proc = Process(
+        target=exec_task_lifecycle,
+        args=('Test', WriteAllLogTypes, None, bus, result),
+        daemon=False
+    )
+    proc.start()
+    proc.join()
+    log_result = []
+    while not bus.empty():
+        msg = bus.get()
+        if isinstance(msg, LogWriteEvent) and msg.message != '\n':
+            log_result.append(msg.severity)
+    assert(log_result == [
+        Severity.INFO.value,
+        Severity.INFO.value,
+        Severity.DEBUG.value,
+        Severity.WARNING.value,
+        Severity.ERROR.value,
+        Severity.CRITICAL.value,
+        Severity.ERROR.value
+    ])
