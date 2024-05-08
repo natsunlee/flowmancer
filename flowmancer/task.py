@@ -19,7 +19,7 @@ def task(t: type[Task]):
 
 
 class Task(ABC, BaseModel, Lifecycle):
-    model_config = ConfigDict(extra='forbid', use_enum_values=True, arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra='forbid', arbitrary_types_allowed=True)
     # Need to skip validation for these, which may contain `multiprocessing.managers` objects. Validation appears to
     # interfere with their functioning...
     shared_dict: SkipValidation[Dict[str, Any]] = Field(default_factory=dict, frozen=True)

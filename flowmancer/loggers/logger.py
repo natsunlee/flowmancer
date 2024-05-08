@@ -19,7 +19,7 @@ def logger(t: type[Logger]) -> Any:
 
 
 class Logger(ABC, AsyncLifecycle, BaseModel):
-    model_config = ConfigDict(extra='forbid', use_enum_values=True)
+    model_config = ConfigDict(extra='forbid')
 
     @abstractmethod
     async def update(self, m: SerializableLogEvent) -> None:

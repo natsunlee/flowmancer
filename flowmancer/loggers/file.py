@@ -48,7 +48,7 @@ class FileLogger(Logger):
             f = self._state.file_handles.get(msg.name)
             if not f or f.closed:
                 raise LogFileNotOpen(f'Log file is not open for {msg.name}')
-            template = '[{ts}] {sev} - {m}'
+            template = '[{ts}] {sev} - {m}\n'
             f.write(template.format(
                 sev=msg.severity,
                 ts=msg.timestamp,

@@ -30,7 +30,7 @@ class CheckpointContents:
 
 
 class Checkpointer(ABC, BaseModel, AsyncLifecycle):
-    model_config = ConfigDict(extra='forbid', use_enum_values=True)
+    model_config = ConfigDict(extra='forbid')
 
     @abstractmethod
     async def write_checkpoint(self, name: str, content: CheckpointContents) -> None:

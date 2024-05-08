@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 import pytest
 
@@ -93,7 +94,9 @@ async def test_log_pusher_ends_root_event():
 async def test_log_pusher_ends_empty_queue():
     root_event = asyncio.Event()
     f = Flowmancer(test=True)
-    f._log_event_bus.put(LogWriteEvent(name='test', severity=Severity.INFO, message='test'))
+    f._log_event_bus.put(LogWriteEvent(
+        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now().isoformat()
+    ))
     tasks = f._init_loggers(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
@@ -130,7 +133,9 @@ async def test_all_pusher_ends_empty_queue(success_task_cls):
     root_event = asyncio.Event()
     f = Flowmancer(test=True)
     f.add_executor(name='test', task_class=success_task_cls)
-    f._log_event_bus.put(LogWriteEvent(name='test', severity=Severity.INFO, message='test'))
+    f._log_event_bus.put(LogWriteEvent(
+        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now().isoformat()
+    ))
     f._execution_event_bus.put(
         ExecutionStateTransition(
             name='test',

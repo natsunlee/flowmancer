@@ -7,7 +7,7 @@ from typing import Iterable, Optional
 from . import EventBus, SerializableEvent, serializable_event
 
 
-class Severity(Enum):
+class Severity(str, Enum):
     DEBUG = 'DEBUG'
     INFO = 'INFO'
     WARNING = 'WARNING'
@@ -34,7 +34,7 @@ class LogEndEvent(SerializableLogEvent):
 @serializable_event
 class LogWriteEvent(SerializableLogEvent):
     name: str
-    severity: str
+    severity: Severity
     message: str
     timestamp: str
 
@@ -53,12 +53,12 @@ class LogWriter:
         if self.bus:
             self.bus.put(LogStartEvent(name=self.name))
 
-    def emit_log_write_event(self, message: str, severity: Severity, end='\n') -> None:
+    def emit_log_write_event(self, message: str, severity: Severity) -> None:
         if self.bus:
             self.bus.put(LogWriteEvent(
                 name=self.name,
-                severity=severity.value,
-                message=message+end,
+                severity=severity,
+                message=message,
                 timestamp=datetime.now().isoformat()
             ))
 
