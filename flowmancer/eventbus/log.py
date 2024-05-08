@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 from typing import Iterable, Optional
 
@@ -33,8 +34,9 @@ class LogEndEvent(SerializableLogEvent):
 @serializable_event
 class LogWriteEvent(SerializableLogEvent):
     name: str
-    severity: Severity
+    severity: str
     message: str
+    timestamp: str
 
 
 @serializable_event
@@ -51,9 +53,14 @@ class LogWriter:
         if self.bus:
             self.bus.put(LogStartEvent(name=self.name))
 
-    def emit_log_write_event(self, message: str, severity: Severity) -> None:
+    def emit_log_write_event(self, message: str, severity: Severity, end='\n') -> None:
         if self.bus:
-            self.bus.put(LogWriteEvent(name=self.name, severity=severity, message=message))
+            self.bus.put(LogWriteEvent(
+                name=self.name,
+                severity=severity.value,
+                message=message+end,
+                timestamp=datetime.now().isoformat()
+            ))
 
     def close(self) -> None:
         if self.bus:
@@ -62,12 +69,14 @@ class LogWriter:
 
 class StdOutLogWriterWrapper:
     __slots__ = ('_base')
+    _sev = Severity.INFO
 
     def __init__(self, log_writer: LogWriter) -> None:
         self._base = log_writer
 
     def write(self, m: str) -> None:
-        self._base.emit_log_write_event(m, Severity.INFO)
+        if m.strip():
+            self._base.emit_log_write_event(m, self._sev)
 
     def writelines(self, mlist: Iterable[str]) -> None:
         for m in mlist:
@@ -83,8 +92,7 @@ class StdOutLogWriterWrapper:
 
 
 class StdErrLogWriterWrapper(StdOutLogWriterWrapper):
-    def write(self, m: str) -> None:
-        self._base.emit_log_write_event(m, Severity.ERROR)
+    _sev = Severity.ERROR
 
 
 class TaskLogWriterWrapper:
