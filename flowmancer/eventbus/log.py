@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable, Optional
+
+from pydantic import field_serializer
 
 from . import EventBus, SerializableEvent, serializable_event
 
@@ -36,7 +38,11 @@ class LogWriteEvent(SerializableLogEvent):
     name: str
     severity: Severity
     message: str
-    timestamp: str
+    timestamp: datetime
+
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, timestamp: datetime, *_):
+        return timestamp.isoformat()
 
 
 @serializable_event
@@ -59,7 +65,7 @@ class LogWriter:
                 name=self.name,
                 severity=severity,
                 message=message,
-                timestamp=datetime.now().isoformat()
+                timestamp=datetime.now(timezone.utc).astimezone()
             ))
 
     def close(self) -> None:

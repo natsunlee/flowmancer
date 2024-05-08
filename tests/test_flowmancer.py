@@ -95,7 +95,7 @@ async def test_log_pusher_ends_empty_queue():
     root_event = asyncio.Event()
     f = Flowmancer(test=True)
     f._log_event_bus.put(LogWriteEvent(
-        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now().isoformat()
+        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now()
     ))
     tasks = f._init_loggers(root_event)
     root_event.set()
@@ -134,7 +134,7 @@ async def test_all_pusher_ends_empty_queue(success_task_cls):
     f = Flowmancer(test=True)
     f.add_executor(name='test', task_class=success_task_cls)
     f._log_event_bus.put(LogWriteEvent(
-        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now().isoformat()
+        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now()
     ))
     f._execution_event_bus.put(
         ExecutionStateTransition(
