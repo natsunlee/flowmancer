@@ -12,7 +12,7 @@ class SerializableExecutionEvent(SerializableEvent):
         return 'SerializableExecutionEvent'
 
 
-class ExecutionState(Enum):
+class ExecutionState(str, Enum):
     FAILED = 'F'
     PENDING = 'P'
     RUNNING = 'R'

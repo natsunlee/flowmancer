@@ -13,7 +13,7 @@ def manager():
 @task
 class TestTask(Task):
     def run(self) -> None:
-        self._shared_dict['myvar'] = 'hello'
+        self.shared_dict['myvar'] = 'hello'
         print('hello')
 
 
@@ -99,3 +99,15 @@ class LifecycleFailTask(LifecycleSuccessTask):
 @pytest.fixture(scope='session')
 def lifecycle_fail_task_cls():
     return LifecycleFailTask
+
+
+@task
+class WriteAllLogTypes(Task):
+    def run(self) -> None:
+        print('stdout')
+        self.logger.info('info')
+        self.logger.debug('debug')
+        self.logger.warning('warning')
+        self.logger.error('error')
+        self.logger.critical('critical')
+        raise RuntimeError('stderr')

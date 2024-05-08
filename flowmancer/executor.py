@@ -13,7 +13,13 @@ from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Optional, Text
 
 from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
-from .eventbus.log import LogWriter, SerializableLogEvent
+from .eventbus.log import (
+    LogWriter,
+    SerializableLogEvent,
+    StdErrLogWriterWrapper,
+    StdOutLogWriterWrapper,
+    TaskLogWriterWrapper,
+)
 from .task import Task, _task_classes
 
 
@@ -36,34 +42,39 @@ class ProcessResult:
 
 def exec_task_lifecycle(
     task_name: str,
-    task_instance: Task,
+    task_class: Type[Task],
+    parameters: Optional[Dict[str, Any]],
     log_event_bus: Optional[EventBus[SerializableLogEvent]],
     result: ProcessResult,
     shared_dict: Optional[Union[Dict[str, Any], DictProxy[str, Any]]] = None,
     is_restart: bool = False
 ):
+    base_log_writer = LogWriter(task_name, log_event_bus)
     # Pydantic's BaseModel appears to interfere with the Manager objects when it serializes model values...
     # As a result, any Manager objects should be assigned here directly after being split off into a new process.
-    if shared_dict is not None:
-        task_instance._shared_dict = cast(Dict[str, Any], shared_dict)
+    parameters = parameters or dict()
+    parameters['logger'] = TaskLogWriterWrapper(base_log_writer)
+    parameters['shared_dict'] = cast(Dict[str, Any], shared_dict) if shared_dict is not None else dict()
+    task_instance = task_class(**parameters)
+
+    # Bind signal only in new child process
+    stdout_log_writer = cast(TextIO, StdOutLogWriterWrapper(base_log_writer))
+    stderr_log_writer = cast(TextIO, StdErrLogWriterWrapper(base_log_writer))
 
     def _exec_lifecycle_stage(stage: Callable[[], None]) -> None:
         try:
             stage()
         except Exception:
-            print(traceback.format_exc())
+            print(traceback.format_exc(), file=stderr_log_writer)
             result.is_failed = True
 
-    # Bind signal only in new child process
     signal.signal(signal.SIGTERM, lambda *_: _exec_lifecycle_stage(task_instance.on_abort))
-    writer = cast(TextIO, LogWriter(task_name, log_event_bus))
-
     _sout = sys.stdout
     _serr = sys.stderr
 
     try:
-        sys.stdout = writer
-        sys.stderr = writer
+        sys.stdout = stdout_log_writer
+        sys.stderr = stderr_log_writer
 
         _exec_lifecycle_stage(task_instance.on_create)
 
@@ -78,11 +89,11 @@ def exec_task_lifecycle(
             _exec_lifecycle_stage(task_instance.on_success)
             result.is_failed = False
     except Exception:
-        print(traceback.format_exc())
+        print(traceback.format_exc(), file=sys.stderr)
         result.is_failed = True
     finally:
         _exec_lifecycle_stage(task_instance.on_destroy)
-        writer.close()
+        base_log_writer.close()
         sys.stdout = _sout
         sys.stderr = _serr
 
@@ -127,12 +138,11 @@ class Executor:
             self.execution_event_bus.put(event)
         self._state = val
 
-    def get_task_instance(self) -> Task:
-        parameters = self.parameters or dict()
+    def get_task_class(self) -> Type[Task]:
         if inspect.isclass(self.task_class) and issubclass(self.task_class, Task):
-            return self.task_class(**parameters)
+            return self.task_class
         elif type(self.task_class) == str:
-            return _task_classes[self.task_class](**parameters)
+            return _task_classes[self.task_class]
         else:
             raise TypeError('The `task_class` param must be either an extension of `Task` or the string name of one.')
 
@@ -181,7 +191,8 @@ class Executor:
                         target=exec_task_lifecycle,
                         args=(
                             self.name,
-                            self.get_task_instance(),
+                            self.get_task_class(),
+                            self.parameters,
                             self.log_event_bus,
                             result,
                             self.shared_dict,

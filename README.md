@@ -275,7 +275,7 @@ from flowmancer.task import Task, task
 from pydantic import BaseModel
 from typing import Dict, List
 
-class Protocol(Enum):
+class Protocol(str, Enum):
     HTTP: 'HTTP'
     HTTPS: 'HTTPS'
 
@@ -353,7 +353,7 @@ class SlackMessageLogger(Logger):
             self._post_to_slack(f'[{evt.name}] END: Logging is ending')
         # The `LogWriteEvent` additionally has `severity` and `message` properties.
         elif isinstance(evt, LogWriteEvent):
-            self._post_to_slack(f'[{evt.name}] {evt.severity}: {evt.message}')
+            self._post_to_slack(f'[{evt.name}] {evt.severity.value}: {evt.message}')
 ```
 
 The `Logger` implementation may also have the following optional `async` lifecycle methods:

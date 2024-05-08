@@ -67,7 +67,7 @@ class JobDefinition(JobDefinitionComponent):
 
 
 class LoadParams(BaseModel):
-    model_config = ConfigDict(extra='forbid', use_enum_values=True)
+    model_config = ConfigDict(extra='forbid')
     APP_ROOT_DIR: str = '.'
 
 

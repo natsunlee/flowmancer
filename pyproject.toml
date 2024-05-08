@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flowmancer"
-version = "0.10.5"
+version = "0.11.0"
 description = "The Python Thing-Doer"
 authors = ["Nathan Lee <lee.nathan.sh@outlook.com>"]
 license = "MIT"

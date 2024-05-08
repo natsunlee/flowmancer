@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 import pytest
 
@@ -13,7 +14,7 @@ def test_add_executor(test_task_cls):
     f.add_executor(name='a', task_class=test_task_cls)
     assert (
         len(f._executors) == 1
-        and isinstance(f._executors['a'].instance.get_task_instance(), test_task_cls)
+        and isinstance(f._executors['a'].instance.get_task_class()(), test_task_cls)
         and not f._executors['a'].dependencies
         and len(f._states[ExecutionState.INIT]) == 1
         and 'a' in f._states[ExecutionState.INIT]
@@ -25,7 +26,7 @@ def test_add_executor_by_str_name(test_task_cls):
     f.add_executor(name='a', task_class='TestTask')
     assert (
         len(f._executors) == 1
-        and isinstance(f._executors['a'].instance.get_task_instance(), test_task_cls)
+        and isinstance(f._executors['a'].instance.get_task_class()(), test_task_cls)
         and not f._executors['a'].dependencies
         and len(f._states[ExecutionState.INIT]) == 1
         and 'a' in f._states[ExecutionState.INIT]
@@ -93,7 +94,9 @@ async def test_log_pusher_ends_root_event():
 async def test_log_pusher_ends_empty_queue():
     root_event = asyncio.Event()
     f = Flowmancer(test=True)
-    f._log_event_bus.put(LogWriteEvent(name='test', severity=Severity.INFO, message='test'))
+    f._log_event_bus.put(LogWriteEvent(
+        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now()
+    ))
     tasks = f._init_loggers(root_event)
     root_event.set()
     await asyncio.gather(*tasks)
@@ -130,7 +133,9 @@ async def test_all_pusher_ends_empty_queue(success_task_cls):
     root_event = asyncio.Event()
     f = Flowmancer(test=True)
     f.add_executor(name='test', task_class=success_task_cls)
-    f._log_event_bus.put(LogWriteEvent(name='test', severity=Severity.INFO, message='test'))
+    f._log_event_bus.put(LogWriteEvent(
+        name='test', severity=Severity.INFO, message='test', timestamp=datetime.now()
+    ))
     f._execution_event_bus.put(
         ExecutionStateTransition(
             name='test',
