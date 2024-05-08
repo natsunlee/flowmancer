@@ -18,7 +18,7 @@ def extension(t: type[Extension]):
 
 
 class Extension(ABC, AsyncLifecycle, BaseModel):
-    model_config = ConfigDict(extra='forbid', use_enum_values=True)
+    model_config = ConfigDict(extra='forbid')
 
     @abstractmethod
     async def update(self, e: SerializableExecutionEvent) -> None:

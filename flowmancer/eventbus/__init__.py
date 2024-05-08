@@ -20,7 +20,7 @@ class NotADeserializableEventError(Exception):
 
 
 class SerializableEvent(BaseModel, ABC):
-    model_config = ConfigDict(extra='forbid', use_enum_values=True)
+    model_config = ConfigDict(extra='forbid')
 
     @classmethod
     @abstractmethod
