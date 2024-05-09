@@ -4,16 +4,17 @@ import asyncio
 import contextlib
 import importlib
 import inspect
+import json
 import os
 import pkgutil
 import time
 from argparse import ArgumentParser
-from collections import namedtuple
+from dataclasses import dataclass
 from multiprocessing import Manager
 from multiprocessing.managers import DictProxy
-from typing import Any, Dict, List, Optional, Type, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailableError
 from .checkpointer.checkpointer import _checkpointer_classes
@@ -38,7 +39,11 @@ from .task import Task
 
 __all__ = ['Flowmancer']
 
-ExecutorDetails = namedtuple('ExecutorDetails', 'instance dependencies')
+
+@dataclass
+class ExecutorDetails:
+    instance: Executor
+    dependencies: List[str]
 
 
 # Need to explicitly manage loop in case multiple instances of Flowmancer are run.
@@ -74,7 +79,7 @@ def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
 
     for x in pkgutil.iter_modules(path=[path]):
         try:
-            print(f"importing: {'.'.join(package_chain+[x.name])}")
+            print(f"Loading Module: {'.'.join(package_chain+[x.name])}")
             importlib.import_module('.'.join(package_chain+[x.name]))
         except Exception as e:
             print(
@@ -130,10 +135,43 @@ class Flowmancer:
                 raise NoTasksLoadedError(
                     'No Tasks have been loaded! Please check that you have provided a valid Job Definition file.'
                 )
+
+            task_errors, unhandled_errors = self._validate_tasks()
+            if task_errors or unhandled_errors:
+                print('Errors exist for task parameters in the provided JobDefinition:')
+                for name, err_list in task_errors.items():
+                    # print(f'tasks.{name}.parameters')
+                    for err in err_list:
+                        print(f' - tasks.{name}.parameters.{".".join(err["loc"])}: {err["msg"]}')
+                for name, err_str in unhandled_errors.items():
+                    print(f' - {name}: {err_str}')
+                return 1
+
             ret = asyncio.run(self._initiate())
             return ret
+        except ValidationError as e:
+            print('Errors exist in the provided JobDefinition:')
+            error_list = json.loads(e.json())
+            for err in error_list:
+                print(f' - {".".join(err["loc"])}: {err["msg"]}')
+            return 2
+        except NoTasksLoadedError as e:
+            print(str(e))
+            return 3
         finally:
             os.chdir(orig_cwd)
+
+    def _validate_tasks(self) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, str]]:
+        errors = {}
+        unhandled = {}
+        for n, ex in self._executors.items():
+            try:
+                ex.instance.get_task_class()(**(ex.instance.parameters or {}))
+            except ValidationError as e:
+                errors[n] = json.loads(e.json())
+            except Exception as e:
+                unhandled[n] = str(e)
+        return errors, unhandled
 
     async def _initiate(self) -> int:
         with _create_loop():

@@ -146,6 +146,9 @@ class Executor:
         else:
             raise TypeError('The `task_class` param must be either an extension of `Task` or the string name of one.')
 
+    def get_task_instance(self) -> Task:
+        return self.get_task_class()(**(self.parameters or {}))
+
     @asynccontextmanager
     async def acquire_lock(self) -> AsyncIterator[Any]:
         try:
