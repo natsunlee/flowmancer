@@ -34,3 +34,15 @@ class TaskValidationError(Exception):
     @property
     def errors(self) -> List[Dict[str, str]]:
         return self._errors
+
+
+class VarFormatError(Exception):
+    pass
+
+
+class TaskClassNotFoundError(Exception):
+    pass
+
+
+class ModuleLoadError(Exception):
+    pass

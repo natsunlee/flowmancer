@@ -25,9 +25,11 @@ from .eventbus.log import SerializableLogEvent
 from .exceptions import (
     CheckpointInvalidError,
     ExtensionsDirectoryNotFoundError,
+    ModuleLoadError,
     NotAPackageError,
     NoTasksLoadedError,
     TaskValidationError,
+    VarFormatError,
 )
 from .executor import Executor
 from .extensions.extension import Extension, _extension_classes
@@ -62,7 +64,7 @@ def _create_loop():
     loop.close()
 
 
-def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
+def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None) -> None:
     if not path.startswith('/'):
         path = os.path.abspath(
             os.path.join(
@@ -79,6 +81,7 @@ def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
         raise NotAPackageError(f"Only packages (directories) are allowed. The following is not a dir: '{path}'")
     if not os.path.exists(os.path.join(path, '__init__.py')):
         print(f"WARNING: The '{path}' dir is not a package (no __init__.py file found). Modules will not be imported.")
+        return None
 
     if not package_chain:
         package_chain = [os.path.basename(path)]
@@ -88,9 +91,7 @@ def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
             print(f"Loading Module: {'.'.join(package_chain+[x.name])}")
             importlib.import_module('.'.join(package_chain+[x.name]))
         except Exception as e:
-            print(
-                f"WARNING: Skipping import for '{'.'.join(package_chain+[x.name])}' due to {type(e).__name__}: {str(e)}"
-            )
+            raise ModuleLoadError(f"Error loading '{'.'.join(package_chain+[x.name])}': {e}")
         if x.ispkg:
             _load_extensions_path(os.path.join(path, x.name), package_chain+[x.name])
 
@@ -153,21 +154,16 @@ class Flowmancer:
         except ValidationError as e:
             if raise_exception_on_failure:
                 raise
-            print('Errors exist in the provided JobDefinition:')
+            print('ERROR: Errors exist in the provided JobDefinition:')
             error_list = json.loads(e.json())
             for err in error_list:
                 print(f' - {".".join(err["loc"])}: {err["msg"]}')
             return 1
-        except TaskValidationError as e:
+        except Exception as e:
             if raise_exception_on_failure:
                 raise
-            print(e)
-            return 2
-        except NoTasksLoadedError as e:
-            if raise_exception_on_failure:
-                raise
-            print(e)
-            return 3
+            print(f'ERROR: {e}')
+            return 99
         finally:
             os.chdir(orig_cwd)
 
@@ -180,7 +176,7 @@ class Flowmancer:
                 for ve in json.loads(e.json()):
                     err.add_error(f'tasks.{n}.parameters.{".".join(ve["loc"])}', ve['msg'])
             except Exception as e:
-                err.add_error(f'tasks.{n}.parameters.{".".join(ve["loc"])}', str(e))
+                err.add_error(f'tasks.{n}', repr(e))
         if err.errors:
             raise err
 
@@ -243,7 +239,7 @@ class Flowmancer:
         for v in args.jobdef_vars:
             parts = v.split('=')
             if len(parts) <= 1:
-                raise ValueError('`var` arguments must follow the pattern: <key>=<value>')
+                raise VarFormatError('`var` arguments must follow the pattern: <key>=<value>')
             self.set_jobdef_var(parts[0], '='.join(parts[1:]))
 
         if args.jobdef:

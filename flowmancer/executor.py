@@ -20,6 +20,7 @@ from .eventbus.log import (
     StdOutLogWriterWrapper,
     TaskLogWriterWrapper,
 )
+from .exceptions import TaskClassNotFoundError
 from .task import Task, _task_classes
 
 
@@ -142,6 +143,8 @@ class Executor:
         if inspect.isclass(self.task_class) and issubclass(self.task_class, Task):
             return self.task_class
         elif type(self.task_class) == str:
+            if self.task_class not in _task_classes:
+                raise TaskClassNotFoundError(self.task_class)
             return _task_classes[self.task_class]
         else:
             raise TypeError('The `task_class` param must be either an extension of `Task` or the string name of one.')
