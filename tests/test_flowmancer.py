@@ -5,7 +5,9 @@ import pytest
 
 from flowmancer.eventbus.execution import ExecutionState, ExecutionStateTransition
 from flowmancer.eventbus.log import LogWriteEvent, Severity
+from flowmancer.exceptions import NoTasksLoadedError, TaskValidationError
 from flowmancer.flowmancer import Flowmancer
+from flowmancer.jobdefinition import JobDefinition, TaskDefinition
 
 
 # ADD EXECUTOR TESTS
@@ -210,3 +212,28 @@ def test_multiple_executor_fail_run(success_task_cls, fail_task_cls):
         and f._executors['d'].instance.state == ExecutionState.COMPLETED
         and retcode == 2
     )
+
+
+# JOBDEF VALIDATIONS
+def test_jobdef_task_unexpected_prop():
+    f = Flowmancer(test=True)
+    j = JobDefinition(tasks={'my-task': TaskDefinition(task='SuccessTask', parameters={'bad': 'fail'})})
+    f.load_job_definition(j, '.')
+    with pytest.raises(TaskValidationError):
+        f._validate_tasks()
+
+
+def test_jobdef_task_missing_prop():
+    f = Flowmancer(test=True)
+    j = JobDefinition(tasks={'my-task': TaskDefinition(task='TaskWithRequiredProp')})
+    f.load_job_definition(j, '.')
+    with pytest.raises(TaskValidationError):
+        f._validate_tasks()
+
+
+def test_jobdef_empty_tasks():
+    f = Flowmancer(test=True)
+    j = JobDefinition(tasks={})
+    f.load_job_definition(j, '.')
+    with pytest.raises(NoTasksLoadedError):
+        f.start(raise_exception_on_failure=True)
