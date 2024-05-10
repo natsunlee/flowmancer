@@ -22,7 +22,7 @@ Simply install the `flowmancer` package with:
 pip3 install flowmancer
 ```
 
-NOTE: `flowmancer` supports only Python 3.7 and higher.
+NOTE: `flowmancer` supports only Python 3.8.1 and higher. Generally speaking, support will follow the [status of Python versions](https://devguide.python.org/versions/), though minimum supported version may occasionally be higher due to requirements of critical dependencies.
 
 ## Basic Usage
 Let's assume you have a new project with a basic structure like so:
