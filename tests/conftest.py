@@ -111,3 +111,11 @@ class WriteAllLogTypes(Task):
         self.logger.error('error')
         self.logger.critical('critical')
         raise RuntimeError('stderr')
+
+
+@task
+class TaskWithRequiredProp(Task):
+    id: str
+
+    def run(self) -> None:
+        print(self.id)

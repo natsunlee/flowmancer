@@ -4,16 +4,17 @@ import asyncio
 import contextlib
 import importlib
 import inspect
+import json
 import os
 import pkgutil
 import time
 from argparse import ArgumentParser
-from collections import namedtuple
+from dataclasses import dataclass
 from multiprocessing import Manager
 from multiprocessing.managers import DictProxy
 from typing import Any, Dict, List, Optional, Type, Union, cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailableError
 from .checkpointer.checkpointer import _checkpointer_classes
@@ -21,7 +22,13 @@ from .checkpointer.file import FileCheckpointer
 from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateMap, ExecutionStateTransition, SerializableExecutionEvent
 from .eventbus.log import SerializableLogEvent
-from .exceptions import CheckpointInvalidError, ExtensionsDirectoryNotFoundError, NotAPackageError, NoTasksLoadedError
+from .exceptions import (
+    CheckpointInvalidError,
+    ExtensionsDirectoryNotFoundError,
+    NotAPackageError,
+    NoTasksLoadedError,
+    TaskValidationError,
+)
 from .executor import Executor
 from .extensions.extension import Extension, _extension_classes
 from .jobdefinition import (
@@ -38,7 +45,11 @@ from .task import Task
 
 __all__ = ['Flowmancer']
 
-ExecutorDetails = namedtuple('ExecutorDetails', 'instance dependencies')
+
+@dataclass
+class ExecutorDetails:
+    instance: Executor
+    dependencies: List[str]
 
 
 # Need to explicitly manage loop in case multiple instances of Flowmancer are run.
@@ -74,7 +85,7 @@ def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None):
 
     for x in pkgutil.iter_modules(path=[path]):
         try:
-            print(f"importing: {'.'.join(package_chain+[x.name])}")
+            print(f"Loading Module: {'.'.join(package_chain+[x.name])}")
             importlib.import_module('.'.join(package_chain+[x.name]))
         except Exception as e:
             print(
@@ -117,8 +128,14 @@ class Flowmancer:
             raise TypeError(f'str expected for `key`, not {type(key)}')
         del self._jobdef_vars[key]
 
-    def start(self, default_jobdef_path: Optional[str] = None, default_jobdef_type: str = 'yaml') -> int:
+    def start(
+        self,
+        default_jobdef_path: Optional[str] = None,
+        default_jobdef_type: str = 'yaml',
+        raise_exception_on_failure: bool = False
+    ) -> int:
         orig_cwd = os.getcwd()
+
         try:
             # Ensure any components, such as file loggers, work with respect to the .py file in which the `start`
             # command is invoked, which is usually the project root dir.
@@ -130,10 +147,42 @@ class Flowmancer:
                 raise NoTasksLoadedError(
                     'No Tasks have been loaded! Please check that you have provided a valid Job Definition file.'
                 )
+            self._validate_tasks()
             ret = asyncio.run(self._initiate())
             return ret
+        except ValidationError as e:
+            if raise_exception_on_failure:
+                raise
+            print('Errors exist in the provided JobDefinition:')
+            error_list = json.loads(e.json())
+            for err in error_list:
+                print(f' - {".".join(err["loc"])}: {err["msg"]}')
+            return 1
+        except TaskValidationError as e:
+            if raise_exception_on_failure:
+                raise
+            print(e)
+            return 2
+        except NoTasksLoadedError as e:
+            if raise_exception_on_failure:
+                raise
+            print(e)
+            return 3
         finally:
             os.chdir(orig_cwd)
+
+    def _validate_tasks(self) -> None:
+        err = TaskValidationError('Errors exist in the provided JobDefinition for one or more tasks.')
+        for n, ex in self._executors.items():
+            try:
+                ex.instance.get_task_class()(**(ex.instance.parameters or {}))
+            except ValidationError as e:
+                for ve in json.loads(e.json()):
+                    err.add_error(f'tasks.{n}.parameters.{".".join(ve["loc"])}', ve['msg'])
+            except Exception as e:
+                err.add_error(f'tasks.{n}.parameters.{".".join(ve["loc"])}', str(e))
+        if err.errors:
+            raise err
 
     async def _initiate(self) -> int:
         with _create_loop():
