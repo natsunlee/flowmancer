@@ -50,7 +50,8 @@ from flowmancer.task import Task, task
 
 @task
 class WaitAndSucceed(Task):
-    # All variables should be given type hints and optional vars should be given default values.
+    # All variables should be given type hints and optional vars should be given default
+    # values.
     my_required_string_var: str
     my_optional_int_var: int = 5
 
@@ -73,7 +74,8 @@ class ImmediatelySucceed(Task):
 class FailImmediately(Task):
     def run(self):
         print(f"Printing `my_var` value: {self.shared_dict['my_var']}")
-        # Raise errors to cause tasks to fail and additionally block dependent tasks, if any.
+        # Raise errors to cause tasks to fail and additionally block dependent tasks,
+        # if any.
         raise RuntimeError("Let this be caught by Flowmancer")
 ```
 
@@ -84,8 +86,9 @@ This file describes what code to run, in what order, as well as additional add-o
 ```yaml
 version: 0.1
 
-# This entire config block is currently optional, however, it is recommended to at least provide a unique name for each
-# Job Definition YAML file, as this name is used for checkpointing jobs in the event of failures.
+# This entire config block is currently optional, however, it is recommended to at least
+# provide a unique name for each Job Definition YAML file, as this name is used for
+# checkpointing jobs in the event of failures.
 config:
   name: 'my-flowmancer-job'
 
@@ -104,7 +107,7 @@ tasks:
   # Only run if prior 2 tasks complete successfully
   final-fail-task:
     task: FailImmediately
-    max_attempts: 3  # Retry uup to 2 times upon failure (1 initial exec + 2 retries = 3 attempts)
+    max_attempts: 3  # Retry up to 2 times on failure (1st exec + 2 retries = 3 attempts)
     dependencies:
       - succeed-task-a
       - succeed-task-b
@@ -118,15 +121,22 @@ import sys
 from flowmancer import Flowmancer
 
 if __name__ == '__main__':
-    # The `start()` method will return a non-zero integer on failure, typically equal to the number of failed tasks.
+    # The `start()` method will return a non-zero integer on failure, typically equal to
+    # the number of failed tasks.
     ret = Flowmancer().start()
 
-    # Exceptions from tasks will be captured and logged, rather than being raised up to this level. To cause this
-    # driver program to fail, either explicitly raise your own error OR call sys.exit.
+    # Exceptions from tasks will be captured and logged, rather than being raised up to
+    # this level. To cause this driver program to fail, do one of 3 things:
+
+    # Explicitly raise your own error.
     if ret:
       raise RuntimeError('Flowmancer job has failed!')
 
-    # Alternatively, instead of crashing w/ an exception, simply exit with a non-zero value.
+    # Set optional param `raise_exception_on_failure` to `True in the above `.start()`
+    # call like so:
+    # Flowmancer().start(raise_exception_on_failure=True)
+
+    # Alternatively, instead of crashing w/ an exception, exit with a non-zero value.
     # sys.exit(ret)
 ```
 
@@ -235,8 +245,8 @@ Additionally, the above example could have all `include` values in the `complete
 config:
   name: complete-job
 
-# As with most paths in Job Definition, paths to `include` YAML files are relative to `.py` file where the `.start()`
-# method for Flowmancer is invoked.
+# As with most paths in Job Definition, paths to `include` YAML files are relative to
+# `.py` file where the `.start()` method for Flowmancer is invoked.
 include:
   - ./jobdefs/template.yaml
   - ./jobdefs/cleanup_addon.yaml
