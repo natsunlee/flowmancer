@@ -63,6 +63,13 @@ class YAMLJobDefinition(SerializableJobDefinition):
         merged: Dict[str, Any] = dict()
         with open(filename, 'r') as f:
             process_includes(yaml.safe_load(f.read()), merged, set())
+
+        # Now that YAML processing is complete, drop the top-level `aliases` section, if any. This allows for having a
+        # free-form section for declaring aliases without modifying `JobDefinition` to either add such a section (which
+        # would probably be useless for most non-YAML implementations) or setting `extra` to `True`.
+        if 'aliases' in merged:
+            del merged['aliases']
+
         return JobDefinition(**merged)
 
     def dump(self, jdef: JobDefinition, filename: Union[Path, str]) -> None:

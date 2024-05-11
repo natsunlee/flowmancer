@@ -201,3 +201,35 @@ def test_relative_path_include(
     write_yaml('b.yaml', b)
     jdef = load_yaml_jobdef('b.yaml')
     assert(jdef.tasks['do-something'].task == 'DoSomethingElse')
+
+
+def test_aliases(
+    jobdef_dir: Path,
+    load_yaml_jobdef: Callable[[str], JobDefinition]
+) -> None:
+    yaml_str = (
+        'aliases:\n'
+        '  a: &a hello world\n'
+        '  b: &b [1, 2, 3]\n'
+        '  c: &c\n'
+        '    msg: power overwhelming\n'
+        '    numbers: [0]\n'
+        'tasks:\n'
+        '  do-something:\n'
+        '    task: DoSomething\n'
+        '    parameters:\n'
+        '      msg: *a\n'
+        '      numbers: *b\n'
+        '  do-another-thing:\n'
+        '    task: DoSomething\n'
+        '    parameters:\n'
+        '      <<: *c\n'
+        '      numbers: [999, 9999, 99999]\n'
+    )
+    with open(jobdef_dir / 'a.yaml', 'w') as f:
+        f.write(yaml_str)
+    jdef = load_yaml_jobdef('a.yaml')
+    assert jdef.tasks['do-something'].parameters['msg'] == 'hello world'
+    assert jdef.tasks['do-something'].parameters['numbers'] == [1, 2, 3]
+    assert jdef.tasks['do-another-thing'].parameters['msg'] == 'power overwhelming'
+    assert jdef.tasks['do-another-thing'].parameters['numbers'] == [999, 9999, 99999]

@@ -219,7 +219,7 @@ class Flowmancer:
         default_jobdef_type: str = 'yaml'
     ) -> None:
         # If a relative path is given in `start()`, it should be relative to the `start()` call. This is in contrast
-        # to path given from command line, in which that case paths should be relative to where the command is executed.
+        # to path given from command line, in which case paths should be relative to where the command is executed.
         if default_jobdef_path and not default_jobdef_path.startswith('/'):
             default_jobdef_path = os.path.join(app_root_dir, default_jobdef_path)
         parser = ArgumentParser(description='Flowmancer job execution options.')
@@ -527,7 +527,7 @@ class Flowmancer:
             j.tasks[n] = TaskDefinition(
                 task=type(e.instance.get_task_instance()).__name__,
                 dependencies=[],
-                parameters=e.instance.get_task_instance().dict()
+                parameters=e.instance.get_task_instance().model_dump()
             )
 
         for n, e in self._registered_extensions.items():
