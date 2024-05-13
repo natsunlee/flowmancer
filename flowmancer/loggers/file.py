@@ -50,7 +50,7 @@ class FileLogger(Logger):
                 raise LogFileNotOpen(f'Log file is not open for {msg.name}')
             template = '[{ts}] {sev} - {m}\n'
             f.write(template.format(
-                sev=msg.severity,
+                sev=msg.severity.value,
                 ts=msg.timestamp,
                 m=msg.message
             ))
