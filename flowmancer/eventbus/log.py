@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable, Optional
-
-from pydantic import field_serializer
 
 from . import EventBus, SerializableEvent, serializable_event
 
@@ -18,6 +15,8 @@ class Severity(str, Enum):
 
 
 class SerializableLogEvent(SerializableEvent):
+    name: str
+
     @classmethod
     def event_group(cls) -> str:
         return 'SerializableLogEvent'
@@ -25,24 +24,18 @@ class SerializableLogEvent(SerializableEvent):
 
 @serializable_event
 class LogStartEvent(SerializableLogEvent):
-    name: str
+    ...
 
 
 @serializable_event
 class LogEndEvent(SerializableLogEvent):
-    name: str
+    ...
 
 
 @serializable_event
 class LogWriteEvent(SerializableLogEvent):
-    name: str
     severity: Severity
     message: str
-    timestamp: datetime
-
-    @field_serializer('timestamp')
-    def serialize_timestamp(self, timestamp: datetime, *_):
-        return timestamp.isoformat()
 
 
 @serializable_event
@@ -64,8 +57,7 @@ class LogWriter:
             self.bus.put(LogWriteEvent(
                 name=self.name,
                 severity=severity,
-                message=message,
-                timestamp=datetime.now(timezone.utc).astimezone()
+                message=message
             ))
 
     def close(self) -> None:

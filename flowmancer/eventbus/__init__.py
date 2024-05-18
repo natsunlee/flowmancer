@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from datetime import datetime, timezone
 from queue import Queue
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 _event_classes: Dict[str, Dict[str, Type[SerializableEvent]]] = defaultdict(dict)
 
@@ -21,11 +22,16 @@ class NotADeserializableEventError(Exception):
 
 class SerializableEvent(BaseModel, ABC):
     model_config = ConfigDict(extra='forbid')
+    timestamp: datetime = datetime.now(timezone.utc).astimezone()
 
     @classmethod
     @abstractmethod
     def event_group(cls) -> str:
         raise AttributeError('The `event_group` method has not been defined.')
+
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, timestamp: datetime, *_):
+        return timestamp.isoformat()
 
     def serialize(self) -> str:
         try:
