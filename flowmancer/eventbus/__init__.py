@@ -22,6 +22,7 @@ class NotADeserializableEventError(Exception):
 
 class SerializableEvent(BaseModel, ABC):
     model_config = ConfigDict(extra='forbid')
+    job_name: Optional[str] = None
     timestamp: datetime = datetime.now(timezone.utc).astimezone()
 
     @classmethod
@@ -63,16 +64,21 @@ T = TypeVar('T', bound=SerializableEvent)
 
 
 class EventBus(Generic[T]):
-    __slots__ = ('_queue',)
+    __slots__ = ('_queue', 'job_name')
 
-    def __init__(self, q: Optional[Queue[str]] = None) -> None:
+    def __init__(self, j: str, q: Optional[Queue[str]] = None) -> None:
         self._queue = q or Queue()
+        self.job_name = j
 
     def put(self, m: T) -> None:
         self._queue.put(m.serialize())
 
     def get(self) -> T:
-        return SerializableEvent.deserialize(self._queue.get())
+        # Until it's better determined how to handle global properties, inject into events as they are read.
+        # For now, no checks on key name collisions - not too big an issue since `EventBus` not accepted from users.
+        event = SerializableEvent.deserialize(self._queue.get())
+        event.job_name = self.job_name
+        return event
 
     def empty(self) -> bool:
         return self._queue.empty()

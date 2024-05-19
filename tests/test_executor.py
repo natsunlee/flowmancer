@@ -56,7 +56,7 @@ def test_exec_task_lifecycle_order_fail(manager):
 
 def test_executor_state_change_execution_event_bus():
     name = 'test'
-    bus = EventBus[SerializableExecutionEvent]()
+    bus = EventBus[SerializableExecutionEvent]('flowmancer')
     ex = Executor(name, 'SuccessTask', None, bus)
     ex.state = ExecutionState.PENDING
     ex.state = ExecutionState.RUNNING
@@ -91,7 +91,7 @@ def test_executor_state_change_execution_event_bus():
 @pytest.mark.asyncio
 async def test_executor_start_execution_event_bus(c: str, expected: List[Tuple[str]]):
     name = 'Test'
-    bus = EventBus[SerializableExecutionEvent]()
+    bus = EventBus[SerializableExecutionEvent]('flowmancer')
     ex = Executor(name, c, None, bus, max_attempts=2)
     await ex.start()
     bus_contents = []
@@ -133,7 +133,7 @@ def test_exec_task_lifecycle_shared_dict(manager):
 async def test_executor_process_shared_dict(manager):
     TestTask = _task_classes['TestTask']
     shared_dict = manager.dict()
-    bus = EventBus[SerializableExecutionEvent]()
+    bus = EventBus[SerializableExecutionEvent]('flowmancer')
     ex = Executor('Test', TestTask, None, bus, shared_dict=shared_dict)
     await ex.start()
     assert(shared_dict['myvar'] == 'hello')
@@ -141,7 +141,7 @@ async def test_executor_process_shared_dict(manager):
 
 def test_task_log_queue(manager):
     LifecycleSuccessTask = _task_classes['LifecycleSuccessTask']
-    bus = EventBus[SerializableLogEvent](manager.Queue())
+    bus = EventBus[SerializableLogEvent]('flowmancer', manager.Queue())
     shared_dict = manager.dict()
     shared_dict['events'] = []
     result = ProcessResult()
@@ -162,7 +162,7 @@ def test_task_log_queue(manager):
 
 def test_task_log_wrapper_stdout(manager):
     WriteAllLogTypes = _task_classes['WriteAllLogTypes']
-    bus = EventBus[SerializableLogEvent](manager.Queue())
+    bus = EventBus[SerializableLogEvent]('flowmancer', manager.Queue())
     result = ProcessResult()
     proc = Process(
         target=exec_task_lifecycle,

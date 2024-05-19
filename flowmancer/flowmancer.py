@@ -102,8 +102,8 @@ class Flowmancer:
         self._config: ConfigurationDefinition = ConfigurationDefinition()
         self._test = test
         self._debug = debug
-        self._log_event_bus = EventBus[SerializableLogEvent](manager.Queue())
-        self._execution_event_bus = EventBus[SerializableExecutionEvent]()
+        self._log_event_bus = EventBus[SerializableLogEvent](self._config.name, manager.Queue())
+        self._execution_event_bus = EventBus[SerializableExecutionEvent](self._config.name)
         self._shared_dict: DictProxy[str, Any] = manager.dict()
         self._executors: Dict[str, ExecutorDetails] = dict()
         self._states = ExecutionStateMap()
@@ -476,6 +476,9 @@ class Flowmancer:
         self._loggers_interval_seconds = jobdef.config.loggers_interval_seconds
         self._extensions_interval_seconds = jobdef.config.extensions_interval_seconds
         self._checkpointer_interval_seconds = jobdef.config.checkpointer_interval_seconds
+
+        self._log_event_bus.job_name = self._config.name
+        self._execution_event_bus.job_name = self._config.name
 
         # Recursively import any modules found in the following paths in order to trigger the registration of any
         # decorated classes.
