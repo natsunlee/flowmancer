@@ -160,14 +160,17 @@ class Executor:
             if self.semaphore:
                 self.semaphore.release()
 
+    # Quick patch until the execution handling is improved...this is to ensure all Event objects are init'ed before
+    # firing up Executors to avoid situations where `self.event` for a dependency is None/not yet initialized.
+    def init_event(self) -> None:
+        # Need to wait for main loop to initiate before spawning Event
+        self.event = asyncio.Event()
+
     async def wait(self) -> None:
         await self.event.wait()
 
     async def start(self) -> None:
         try:
-            # Need to wait for main loop to initiate before spawning Event
-            self.event = asyncio.Event()
-
             # In the event of a restart and this task is already complete, return immediately.
             if self.state == ExecutionState.COMPLETED:
                 self.event.set()

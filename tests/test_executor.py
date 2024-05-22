@@ -93,6 +93,7 @@ async def test_executor_start_execution_event_bus(c: str, expected: List[Tuple[s
     name = 'Test'
     bus = EventBus[SerializableExecutionEvent]('flowmancer')
     ex = Executor(name, c, None, bus, max_attempts=2)
+    ex.init_event()
     await ex.start()
     bus_contents = []
     while not bus.empty():
@@ -107,6 +108,7 @@ async def test_executor_failed_dependency():
         return False
 
     ex = Executor('Test', 'SuccessTask', None, None, await_dependencies=f)
+    ex.init_event()
     await ex.start()
     assert(ex.state == ExecutionState.DEFAULTED)
 
@@ -117,6 +119,7 @@ async def test_succeeded_dependency():
         return True
 
     ex = Executor('Test', 'SuccessTask', None, None, await_dependencies=f)
+    ex.init_event()
     await ex.start()
     assert(ex.state == ExecutionState.COMPLETED)
 
@@ -135,6 +138,7 @@ async def test_executor_process_shared_dict(manager):
     shared_dict = manager.dict()
     bus = EventBus[SerializableExecutionEvent]('flowmancer')
     ex = Executor('Test', TestTask, None, bus, shared_dict=shared_dict)
+    ex.init_event()
     await ex.start()
     assert(shared_dict['myvar'] == 'hello')
 

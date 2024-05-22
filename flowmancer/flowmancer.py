@@ -334,6 +334,9 @@ class Flowmancer:
                 else:
                     await asyncio.sleep(self._synchro_interval_seconds)
 
+        for ex in self._executors.values():
+            ex.instance.init_event()
+
         return [asyncio.create_task(_synchro())] + [
             asyncio.create_task(dtl.instance.start())
             for name, dtl in self._executors.items()
