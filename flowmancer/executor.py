@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from multiprocessing import Process
 from multiprocessing.managers import DictProxy
 from multiprocessing.sharedctypes import Value
-from typing import Any, AsyncIterator, Callable, Coroutine, Dict, Optional, TextIO, Type, Union, cast
+from typing import Any, AsyncIterator, Callable, Coroutine, Dict, List, Optional, TextIO, Type, Union, cast
 
 from .eventbus import EventBus
 from .eventbus.execution import ExecutionState, ExecutionStateTransition, SerializableExecutionEvent
@@ -48,7 +48,8 @@ def exec_task_lifecycle(
     log_event_bus: Optional[EventBus[SerializableLogEvent]],
     result: ProcessResult,
     shared_dict: Optional[Union[Dict[str, Any], DictProxy[str, Any]]] = None,
-    is_restart: bool = False
+    is_restart: bool = False,
+    depends_on: Optional[List[str]] = None
 ):
     base_log_writer = LogWriter(task_name, log_event_bus)
     # Pydantic's BaseModel appears to interfere with the Manager objects when it serializes model values...
@@ -56,6 +57,11 @@ def exec_task_lifecycle(
     parameters = parameters or dict()
     parameters['logger'] = TaskLogWriterWrapper(base_log_writer)
     parameters['shared_dict'] = cast(Dict[str, Any], shared_dict) if shared_dict is not None else dict()
+    parameters['metadata'] = {
+        'name': task_name,
+        'variant': task_class.__name__,
+        'depends_on': depends_on or []
+    }
     task_instance = task_class(**parameters)
 
     # Bind signal only in new child process
@@ -112,7 +118,8 @@ class Executor:
         backoff: int = 0,
         await_dependencies: Callable[[], Coroutine[Any, Any, bool]] = _default_await_dependencies,
         is_restart: bool = False,
-        parameters: Optional[Dict[str, Any]] = None
+        parameters: Optional[Dict[str, Any]] = None,
+        depends_on: Optional[List[str]] = None
     ) -> None:
         self.name = name
         self.log_event_bus = log_event_bus
@@ -127,6 +134,7 @@ class Executor:
         self._state = ExecutionState.INIT
         self.proc: Optional[Process] = None
         self.is_restart = is_restart
+        self.depends_on = depends_on
 
     @property
     def state(self) -> ExecutionState:
@@ -205,7 +213,8 @@ class Executor:
                             self.log_event_bus,
                             result,
                             self.shared_dict,
-                            self.is_restart
+                            self.is_restart,
+                            self.depends_on
                         ),
                         daemon=False
                     )
