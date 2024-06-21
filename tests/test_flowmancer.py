@@ -17,7 +17,7 @@ def test_add_executor(test_task_cls):
     assert (
         len(f._executors) == 1
         and isinstance(f._executors['a'].instance.get_task_class()(), test_task_cls)
-        and not f._executors['a'].depends_on
+        and not f._executors['a'].dependencies
         and len(f._states[ExecutionState.INIT]) == 1
         and 'a' in f._states[ExecutionState.INIT]
     )
