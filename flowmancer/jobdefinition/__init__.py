@@ -29,7 +29,7 @@ class LoggerDefinition(JobDefinitionComponent):
 
 class TaskDefinition(JobDefinitionComponent):
     variant: str = Field(alias='task')
-    dependencies: List[str] = []
+    depends_on: List[str] = Field(alias='dependencies', default_factory=list)
     max_attempts: int = 1
     backoff: int = 0
     parameters: Dict[str, Any] = dict()
