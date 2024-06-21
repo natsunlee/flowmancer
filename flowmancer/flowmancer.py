@@ -505,7 +505,7 @@ class Flowmancer:
             self.add_executor(
                 name=n,
                 task_class=t.variant,
-                deps=t.dependencies,
+                deps=t.depends_on,
                 max_attempts=t.max_attempts,
                 backoff=t.backoff,
                 parameters=t.parameters
