@@ -454,7 +454,8 @@ class Flowmancer:
             await_dependencies=await_dependencies,
             max_attempts=max_attempts,
             backoff=backoff,
-            parameters=parameters
+            parameters=parameters,
+            depends_on=deps
         )
 
         self._executors[name] = ExecutorDetails(instance=e, dependencies=(deps or []))

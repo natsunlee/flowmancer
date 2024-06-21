@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation
+from uuid import uuid4
 
 from .eventbus.log import LogWriter, TaskLogWriterWrapper
 from .lifecycle import Lifecycle
@@ -18,6 +19,12 @@ def task(t: type[Task]):
     return t
 
 
+class TaskMetadata(BaseModel):
+    name: str = str(uuid4())
+    variant: str = 'unknown'
+    depends_on: List[str] = []
+
+
 class Task(ABC, BaseModel, Lifecycle):
     model_config = ConfigDict(extra='forbid', arbitrary_types_allowed=True)
     # Need to skip validation for these, which may contain `multiprocessing.managers` objects. Validation appears to
@@ -26,6 +33,7 @@ class Task(ABC, BaseModel, Lifecycle):
     logger: SkipValidation[TaskLogWriterWrapper] = Field(
         default=TaskLogWriterWrapper(LogWriter('Task', None)), frozen=True
     )
+    metadata: TaskMetadata = Field(default_factory=lambda: TaskMetadata(name='unnamed', variant='unknown'), frozen=True)
 
     @abstractmethod
     def run(self) -> None:
