@@ -504,7 +504,7 @@ class Flowmancer:
         for n, t in jobdef.tasks.items():
             self.add_executor(
                 name=n,
-                task_class=t.task,
+                task_class=t.variant,
                 deps=t.dependencies,
                 max_attempts=t.max_attempts,
                 backoff=t.backoff,
@@ -512,17 +512,17 @@ class Flowmancer:
             )
 
         # Checkpointer
-        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer.checkpointer](
+        self._checkpointer_instance = _checkpointer_classes[jobdef.checkpointer.variant](
             **jobdef.checkpointer.parameters
         )
 
         # Observers
         for n, e in jobdef.extensions.items():
-            self._registered_extensions[n] = _extension_classes[e.extension](**e.parameters)
+            self._registered_extensions[n] = _extension_classes[e.variant](**e.parameters)
 
         # Loggers
         for n, l in jobdef.loggers.items():
-            self._registered_loggers[n] = _logger_classes[l.logger](**l.parameters)
+            self._registered_loggers[n] = _logger_classes[l.variant](**l.parameters)
 
         return self
 

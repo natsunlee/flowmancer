@@ -47,7 +47,7 @@ def test_env_var_defaults(
     })
     j = load_yaml_jobdef('a.yaml')
     assert(j.config.name == 'default name')
-    assert(j.tasks['test'].task == 'Test')
+    assert(j.tasks['test'].variant == 'Test')
 
 
 def test_env_var_with_inputs(
@@ -67,8 +67,8 @@ def test_env_var_with_inputs(
     del os.environ['JOB_NAME']
     del os.environ['TASK_CLASS']
     assert(j.config.name == 'custom step name')
-    assert(j.tasks['test'].task == 'DoSomething')
-    assert(j.tasks['notreal'].task == '')
+    assert(j.tasks['test'].variant == 'DoSomething')
+    assert(j.tasks['notreal'].variant == '')
 
 
 def test_sys_var(
@@ -103,8 +103,8 @@ def test_var_as_literal(
         }
     }, True)
     j = load_yaml_jobdef('a.yaml')
-    assert(j.tasks['escaped_env'].task == '$ENV{LITERAL}')
-    assert(j.tasks['escaped_sys'].task == '$SYS{LITERAL}')
+    assert(j.tasks['escaped_env'].variant == '$ENV{LITERAL}')
+    assert(j.tasks['escaped_sys'].variant == '$SYS{LITERAL}')
 
 
 def test_include_order(
@@ -145,7 +145,7 @@ def test_include_order(
     write_yaml('c.yaml', c)
     jdef = load_yaml_jobdef('c.yaml')
     assert(jdef.config.name == 'c')
-    assert(jdef.tasks['do-something'].task == 'DoSomethingElse')
+    assert(jdef.tasks['do-something'].variant == 'DoSomethingElse')
 
 
 def test_nested_include(
@@ -188,19 +188,19 @@ def test_nested_include(
     write_yaml('c.yaml', c)
     jdef = load_yaml_jobdef('c.yaml')
     assert(jdef.config.name == 'c')
-    assert(jdef.tasks['do-something'].task == 'DoSomethingElse')
+    assert(jdef.tasks['do-something'].variant == 'DoSomethingElse')
 
 
 def test_relative_path_include(
     write_yaml: Callable[[str, Dict[str, Any]], Path],
     load_yaml_jobdef: Callable[[str], JobDefinition]
 ) -> None:
-    a = {'tasks': {'do-something': {'task': 'DoSomething'}}}
-    b = {'include': ['./a.yaml'], 'tasks': {'do-something': {'task': 'DoSomethingElse'}}}
+    a = {'tasks': {'do-something': {'variant': 'DoSomething'}}}
+    b = {'include': ['./a.yaml'], 'tasks': {'do-something': {'variant': 'DoSomethingElse'}}}
     write_yaml('a.yaml', a)
     write_yaml('b.yaml', b)
     jdef = load_yaml_jobdef('b.yaml')
-    assert(jdef.tasks['do-something'].task == 'DoSomethingElse')
+    assert(jdef.tasks['do-something'].variant == 'DoSomethingElse')
 
 
 def test_aliases(
@@ -221,7 +221,7 @@ def test_aliases(
         '      msg: *a\n'
         '      numbers: *b\n'
         '  do-another-thing:\n'
-        '    task: DoSomething\n'
+        '    variant: DoSomething\n'
         '    parameters:\n'
         '      <<: *c\n'
         '      numbers: [999, 9999, 99999]\n'
