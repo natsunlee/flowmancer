@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 _job_definition_classes = dict()
 
@@ -19,24 +19,24 @@ def job_definition(key: str) -> Callable:
 
 
 class JobDefinitionComponent(BaseModel):
-    model_config = ConfigDict(extra='forbid', use_enum_values=True)
+    model_config = ConfigDict(extra='forbid', use_enum_values=True, populate_by_name=True)
 
 
 class LoggerDefinition(JobDefinitionComponent):
-    logger: str
+    variant: str = Field(alias='logger')
     parameters: Dict[str, Any] = dict()
 
 
 class TaskDefinition(JobDefinitionComponent):
-    task: str
-    dependencies: List[str] = []
+    variant: str = Field(alias='task')
+    depends_on: List[str] = Field(alias='dependencies', default_factory=list)
     max_attempts: int = 1
     backoff: int = 0
     parameters: Dict[str, Any] = dict()
 
 
 class ExtensionDefinition(JobDefinitionComponent):
-    extension: str
+    variant: str = Field(alias='extension')
     parameters: Dict[str, Any] = dict()
 
 
@@ -52,7 +52,7 @@ class ConfigurationDefinition(JobDefinitionComponent):
 
 
 class CheckpointerDefinition(JobDefinitionComponent):
-    checkpointer: str
+    variant: str = Field(alias='checkpointer')
     parameters: Dict[str, Any] = dict()
 
 
@@ -61,9 +61,11 @@ class JobDefinition(JobDefinitionComponent):
     include: List[Path] = []
     config: ConfigurationDefinition = ConfigurationDefinition()
     tasks: Dict[str, TaskDefinition]
-    loggers: Dict[str, LoggerDefinition] = {'file-logger': LoggerDefinition(logger='FileLogger')}
-    extensions: Dict[str, ExtensionDefinition] = {'progress-bar': ExtensionDefinition(extension='RichProgressBar')}
-    checkpointer: CheckpointerDefinition = CheckpointerDefinition(checkpointer='FileCheckpointer')
+    loggers: Dict[str, LoggerDefinition] = {'file-logger': LoggerDefinition(variant='FileLogger')}  # type: ignore
+    extensions: Dict[str, ExtensionDefinition] = {
+        'progress-bar': ExtensionDefinition(variant='RichProgressBar')  # type: ignore
+    }
+    checkpointer: CheckpointerDefinition = CheckpointerDefinition(variant='FileCheckpointer')  # type: ignore
 
 
 class LoadParams(BaseModel):
