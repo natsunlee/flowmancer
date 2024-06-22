@@ -521,8 +521,8 @@ class Flowmancer:
             self._registered_extensions[n] = _extension_classes[e.variant](**e.parameters)
 
         # Loggers
-        for n, l in jobdef.loggers.items():
-            self._registered_loggers[n] = _logger_classes[l.variant](**l.parameters)
+        for n, detl in jobdef.loggers.items():
+            self._registered_loggers[n] = _logger_classes[detl.variant](**detl.parameters)
 
         return self
 
@@ -540,13 +540,13 @@ class Flowmancer:
         for n, e in self._registered_extensions.items():
             j.extensions[n] = ExtensionDefinition(
                 extension=type(e).__name__,
-                parameters=cast(BaseModel, e).dict()
+                parameters=cast(BaseModel, e).model_dump()
             )
 
-        for n, l in self._registered_loggers.items():
+        for n, variant in self._registered_loggers.items():
             j.loggers[n] = LoggerDefinition(
-                logger=type(l).__name__,
-                parameters=cast(BaseModel, l).dict()
+                logger=type(variant).__name__,
+                parameters=cast(BaseModel, variant).model_dump()
             )
 
         return j

@@ -150,7 +150,7 @@ class Executor:
     def get_task_class(self) -> Type[Task]:
         if inspect.isclass(self.task_class) and issubclass(self.task_class, Task):
             return self.task_class
-        elif type(self.task_class) == str:
+        elif isinstance(self.task_class, str):
             if self.task_class not in _task_classes:
                 raise TaskClassNotFoundError(self.task_class)
             return _task_classes[self.task_class]
