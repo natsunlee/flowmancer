@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation
 from uuid import uuid4
@@ -10,9 +10,10 @@ from .eventbus.log import LogWriter, TaskLogWriterWrapper
 from .lifecycle import Lifecycle
 
 _task_classes = dict()
+T = TypeVar('T', bound='Task')
 
 
-def task(t: type[Task]):
+def task(t: type[T]) -> type[T]:
     if not issubclass(t, Task):
         raise TypeError(f'Must extend `Task` type: {t.__name__}')
     _task_classes[t.__name__] = t

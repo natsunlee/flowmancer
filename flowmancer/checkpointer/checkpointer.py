@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Set
+from typing import Any, Dict, Set, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
 from ..lifecycle import AsyncLifecycle
 
 _checkpointer_classes = dict()
+T = TypeVar('T', bound='Checkpointer')
 
 
-def checkpointer(t: type[Checkpointer]) -> Any:
+def checkpointer(t: type[T]) -> type[T]:
     if not issubclass(t, Checkpointer):
         raise TypeError(f'Must extend `Checkpointer` type: {t.__name__}')
     _checkpointer_classes[t.__name__] = t

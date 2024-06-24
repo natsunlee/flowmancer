@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
 _job_definition_classes = dict()
+T = TypeVar('T', bound='SerializableJobDefinition')
 
 
 def job_definition(key: str) -> Callable:
-    def inner(t: type[SerializableJobDefinition]) -> Type[SerializableJobDefinition]:
+    def inner(t: type[T]) -> Type[T]:
         if not issubclass(t, SerializableJobDefinition):
             raise TypeError(f'Must extend `SerializableJobDefinition` type: {t.__name__}')
         _job_definition_classes[key] = t
