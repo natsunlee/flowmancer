@@ -10,7 +10,7 @@ class FileCheckpointer(Checkpointer):
     checkpoint_dir: str = './.flowmancer'
 
     async def write_checkpoint(self, name: str, content: CheckpointContents) -> None:
-        cdir = Path(self.checkpoint_dir)
+        cdir = Path(self.checkpoint_dir).resolve()
         if not os.path.exists(cdir):
             os.makedirs(cdir, exist_ok=True)
         tmp = cdir / (name + '.tmp')
