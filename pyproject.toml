@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flowmancer"
-version = "0.12.3"
+version = "0.12.4"
 description = "The Python Thing-Doer"
 authors = ["Nathan Lee <lee.nathan.sh@outlook.com>"]
 license = "MIT"
@@ -13,7 +13,7 @@ pydantic = "^2.6.3"
 rich = "^13.7.1"
 urllib3 = "^2.2.1"
 requests = "^2.31.0"
-types-pyyaml = "^6.0.12.32"
+types-pyyaml = "^6.0.12.42"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.2.0"
