@@ -14,6 +14,7 @@ from multiprocessing import Manager
 from multiprocessing.managers import DictProxy
 from typing import Any, Dict, List, Optional, Type, Union, cast
 
+from pathlib import Path
 from pydantic import BaseModel, ValidationError
 
 from .checkpointer import CheckpointContents, Checkpointer, NoCheckpointAvailableError
@@ -64,36 +65,28 @@ def _create_loop():
     loop.close()
 
 
-def _load_extensions_path(path: str, package_chain: Optional[List[str]] = None) -> None:
-    if not path.startswith('/'):
-        path = os.path.abspath(
-            os.path.join(
-                os.path.dirname(
-                    os.path.abspath(inspect.stack()[-1][1])
-                ),
-                path
-            )
-        )
+def _load_extensions_path(path: Path, package_chain: Optional[List[str]] = None) -> None:
+    path_str = str(path.resolve())
 
-    if not os.path.exists(path):
-        raise ExtensionsDirectoryNotFoundError(f"No such directory: '{path}'")
-    if os.path.isfile(path):
-        raise NotAPackageError(f"Only packages (directories) are allowed. The following is not a dir: '{path}'")
-    if not os.path.exists(os.path.join(path, '__init__.py')):
-        print(f"WARNING: The '{path}' dir is not a package (no __init__.py file found). Modules will not be imported.")
+    if not path.exists():
+        raise ExtensionsDirectoryNotFoundError(f"No such directory: '{path_str}'")
+    if path.is_file():
+        raise NotAPackageError(f"Only packages (directories) are allowed. The following is not a dir: '{path_str}'")
+    if not (path / '__init__.py').exists():
+        print(f"WARNING: '{path_str}' dir is not a package (no __init__.py file found). Modules will not be imported.")
         return None
 
     if not package_chain:
-        package_chain = [os.path.basename(path)]
+        package_chain = [path.name]
 
-    for x in pkgutil.iter_modules(path=[path]):
+    for x in pkgutil.iter_modules(path=[path_str]):
         try:
             print(f"Loading Module: {'.'.join(package_chain+[x.name])}")
             importlib.import_module('.'.join(package_chain+[x.name]))
         except Exception as e:
             raise ModuleLoadError(f"Error loading '{'.'.join(package_chain+[x.name])}': {e}")
         if x.ispkg:
-            _load_extensions_path(os.path.join(path, x.name), package_chain+[x.name])
+            _load_extensions_path(path / x.name, package_chain+[x.name])
 
 
 class Flowmancer:
@@ -488,14 +481,14 @@ class Flowmancer:
         # decorated classes.
         for p in ['./tasks', './extensions', './loggers']:
             try:
-                _load_extensions_path(p)
+                _load_extensions_path(Path(p))
             except ExtensionsDirectoryNotFoundError:
                 # Don't error on the absence of dirs that are searched by default.
                 pass
 
         # Allow for missing dir exceptions for passed-in paths.
         for p in jobdef.config.extension_directories:
-            _load_extensions_path(p)
+            _load_extensions_path(Path(p))
 
         for p in jobdef.config.extension_packages:
             importlib.import_module(p)
